@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A Casa — Cozinha (protótipo 3D)</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  canvas { display: block; }
+  #crosshair {
+    position: fixed; top: 50%; left: 50%; width: 6px; height: 6px;
+    margin: -3px 0 0 -3px; border-radius: 50%; background: #eee;
+    opacity: .6; pointer-events: none;
+  }
+  #hud {
+    position: fixed; left: 16px; bottom: 16px; max-width: 46ch;
+    font-family: "Courier New", monospace; font-size: 14px; line-height: 1.5;
+    color: #d8d0c0; text-shadow: 0 1px 3px #000; pointer-events: none;
+    white-space: pre-wrap;
+  }
+  #contador {
+    position: fixed; top: 16px; right: 16px;
+    font-family: "Courier New", monospace; font-size: 13px;
+    color: #a89a80; text-shadow: 0 1px 3px #000; pointer-events: none;
+  }
+  #capa {
+    position: fixed; inset: 0; display: block; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.9); color: #ccc; font-family: "Courier New", monospace;
+    text-align: center; padding: 200px; cursor: pointer; z-index: 10;
+  }
+  #capa small { display: block; margin-top: 10px; color: #888; }
+</style>
+
+<!--
+  Sem bundler de propósito: abrir este arquivo direto no navegador
+  (via um servidor local simples, tipo `python3 -m http.server`) já
+  basta. O importmap resolve "three" pro CDN em tempo de carregamento.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="capa">
+    Clique pra entrar na Cozinha
+    <br>
+    <small>WASD move · mouse olha · clique num objeto pra examinar · Esc sai</small>
+  </div>
+  <div id="crosshair"></div>
+  <div id="hud"></div>
+  <div id="contador"></div>
+
+  <script src="../../core/dados.js"></script>
+  <script src="../../core/estado.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
