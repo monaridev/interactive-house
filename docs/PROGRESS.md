@@ -266,8 +266,13 @@ blueprint 2D e da extração de estado como próximos passos.
   `type="module"`)
 - [ ] Confirmar pé-direito real da Cozinha e ajustar `PE_DIREITO` em
   `main.js`
-- [ ] Desenhar o layout real da bancada/prateleiras (posições atuais
-  são só placeholder pra ter algo clicável)
+- [ ] ~~Desenhar o layout real da bancada/prateleiras~~ — feito e
+  substituído pelo layout v2 (ver Sessão 12, continuação, abaixo)
+- [ ] Iluminação: primeira versão ("meia-luz" literal) estava escura
+  demais pra dar pra avaliar o layout — ambient e as 3 luzes pontuais
+  aumentadas bem acima do clima final pretendido; **ajustar o clima
+  pra baixo de novo só depois que o layout estiver 100% fechado**, pra
+  não misturar as duas decisões
 - [ ] Som espacial (a versão 2D já tem funções de áudio — avaliar
   reaproveitar ou refazer com `THREE.PositionalAudio`)
 - [ ] Decidir como fica a transição entre salas em 3D (a porta já
@@ -275,3 +280,56 @@ blueprint 2D e da extração de estado como próximos passos.
   de cena)
 
 <!-- Próxima sessão: adicionar entrada aqui com o que foi feito -->
+
+### 05/08/2026 — Sessão 12 (continuação — layout v2, a partir de um sketch)
+- Diogo mandou um desenho top-down (bancada e estante nos DOIS CANTOS
+  perto da porta, não espalhadas pela parede inteira; alguns itens
+  soltos no chão) — refeito o `POSICOES` em cima disso
+- Restrição descoberta durante o reposicionamento: o **gelo** não pode
+  ir pro chão porque a própria fala dele diz "um ponto DA BANCADA está
+  mais frio" — mover contradiria o texto. Só a **mancha** ficou no
+  grupo "chão"; os outros 15 objetos têm texto amarrado a bancada ou
+  estante. Se quiser mais itens no chão, é decisão de conteúdo (mudar
+  a fala), não só de posição — pendente de decisão do Diogo
+- Removida a "mesa central" (não existe mais no layout novo — o prato
+  vazio foi pra bancada, junto com o resto, como no desenho)
+- Bancada: canto nordeste perto da porta, 2 níveis (11 objetos:
+  corte + domestico + pratovazio + copo + gelo)
+- Estante: canto noroeste perto da porta, 2 níveis (4 objetos de
+  registro/vigilância — câmera olhando pra bancada)
+- Confirmado 16/16 objetos posicionados, sem sobra, via checagem
+  automática (script Node comparando POSICOES com window.DATA)
+
+### 05/08/2026 — Sessão 12 (continuação — layout v3, sala maior + bancada em L)
+- Diogo achou o cômodo pequeno demais pra "parecer cozinha" e trouxe
+  duas referências: uma planta de cozinha real (4,28m × 3,28m, com
+  pia/torre/geladeira ao longo das paredes e uma ilha central) e um
+  segundo sketch top-down próprio
+- Dimensões da sala aumentadas pra bater com a planta de referência:
+  4,28m × 3,28m (era 4,0 × 3,2)
+- **Bancada virou um balcão em L de verdade**, contornando 3 paredes
+  (parte da norte à direita da porta → parede leste inteira → parte
+  da sul), em vez de ficar concentrada num canto só
+- Refatoração de engenharia junto com o layout: em vez de continuar
+  hardcodando x/z de cada objeto da bancada à mão (não escala — cada
+  mudança de formato = reescrever tudo de novo, que já aconteceu 2x),
+  a bancada agora é descrita como um **caminho** (`CAMINHO_BANCADA`,
+  uma polilinha) e uma função (`distribuirNoCaminho`) espalha os 10
+  objetos uniformemente ao longo dele. Trocar o formato do balcão de
+  novo = só mudar os pontos do caminho, nada mais no arquivo
+- Estante: agora ocupa a parede oeste inteira (cabia pouco no canto
+  antes; com a sala maior, uma fileira só já dá espaço de sobra pros
+  4 objetos de registro/vigilância)
+- **Ilha central voltou** (tinha sido removida na v2): o prato vazio
+  está isolado nela de novo — cabia mal no cômodo pequeno, mas com o
+  aumento faz sentido de novo, e bate com a "ilha" da planta de
+  referência
+- Porta saiu do centro da parede norte (estava simétrica) pra ficar
+  deslocada, como no sketch novo — paredes norte recalculadas pra
+  vão assimétrico
+- Ponto de spawn do jogador movido pro canto sudoeste (perto da
+  estante, longe da porta e da bancada), como indicado no sketch
+  ("losango" = spawn)
+- Validado por script: 16/16 objetos cobertos entre bancada+estante+
+  extras, sem sobra; pontos do caminho da bancada conferidos como
+  todos dentro dos limites da sala
