@@ -67,6 +67,14 @@ com o mesmo DATA, sem divergência real implementada). Seguir só com o
       porta com a lógica condicional já existente). As demais salas
       viram repetição do mesmo padrão.
 
+## Estado atual (06/08/2026)
+
+Fase 2 (Three.js) com a Cozinha tecnicamente fechada: texturas,
+modelos reais dos 16 objetos, colisão contra móveis/paredes e
+iluminação final — ver Sessão 13. Falta testar no navegador, som
+espacial, e o Corredor (segunda sala 3D, prova real de troca de
+cena). Ver "Pendentes" no fim da Sessão 13 pra lista completa.
+
 ## Log de sessões
 
 ### 03/08/2026 — Sessão 1
@@ -333,3 +341,67 @@ blueprint 2D e da extração de estado como próximos passos.
 - Validado por script: 16/16 objetos cobertos entre bancada+estante+
   extras, sem sobra; pontos do caminho da bancada conferidos como
   todos dentro dos limites da sala
+
+### 06/08/2026 — Sessão 13 (v0 — acabamento da Cozinha 3D)
+
+Continuação feita no v0 (sem tokens sobrando no Claude no momento),
+depois reintegrada na estrutura do repo (`projeto/interfaces/3d/`),
+substituindo o casco de Next.js/iframe que o v0 usa só pra preview.
+`core/` e `interfaces/terminal/` não mudaram nada nesta sessão.
+
+`main.js` deixou de ter geometria própria: agora é só o motor (câmera,
+movimento, raycast, HUD, loop) e recebe um descritor de sala de
+`cozinha.js` (`construirCozinha(scene)` → `{ obstaculos, interativos,
+spawn }`). Quando o Corredor existir, é outro arquivo com a mesma
+assinatura — a troca de sala acontece num lugar só.
+
+- **Texturas procedurais** (`texturas.js`, novo) — parede, azulejo,
+  piso, madeira, pedra, geradas via canvas, sem depender de imagem
+  externa (mantém a regra de "abrir o HTML direto, sem build step")
+- **Modelos 3D reais** (`modelos.js`, novo) — os 16 objetos da Cozinha
+  deixaram de ser cubos coloridos por cluster; cada um tem construtor
+  próprio (ex. faca = lâmina + cabo + rebite, tesoura = duas lâminas
+  quase paralelas + argolas). Fallback deliberado pra objeto sem
+  modelo: bloco neutro cinza + aviso no console, pra um objeto
+  esquecido aparecer errado em vez de sumir da sala
+- **Colisão** (`colisao.js`, novo) — jogador como círculo no plano XZ
+  contra obstáculos (caixa/segmento/cilindro), resolvida eixo por
+  eixo (desliza ao raspar num móvel em diagonal, não trava). Bancada,
+  ilha e estante agora bloqueiam o jogador — antes só a parede
+  bloqueava. `desencaixar()` cobre o caso do spawn cair dentro de um
+  móvel depois de um ajuste de layout
+- **Iluminação final** (`cozinha.js`) — a versão "clara demais de
+  propósito" da Sessão 12 foi baixada pro clima final: uma fonte
+  dominante (luminária pendente sobre a ilha, com sombra) + spots de
+  apoio na bancada apontando pra baixo (não mais point lights soltas,
+  que estouravam o azulejo atrás em vez de iluminar o tampo) + luz
+  fria vazando do vão da porta, como única pista de que existe algo
+  além da Cozinha
+- **Objetos alinhados à bancada** — `distribuirNoCaminho()` agora
+  também devolve o ângulo de cada trecho do caminho, e cada objeto
+  usa esse ângulo (`rotY`) em vez de ficar todo apontando pro mesmo
+  lado — sem isso, uma faca atravessada na bancada leste denunciava
+  a cena como gerada por script
+- **Pé-direito confirmado**: 2,70 m (era 2,60 "chute" desde a Sessão
+  12) — referência da NBR 15575 pra altura livre residencial comum
+- Removido o contador `X/16` e o `emissive` marcando objeto já
+  examinado — o sistema 3D estava violando a regra 1 de
+  `World_Design.md` ("nunca confirmar"), que a prova de conceito
+  anterior não respeitava
+- Adicionado modo `?inspecao=1` (liga câmera livre + expõe `scene`/
+  `camera` no console) — ferramenta de desenvolvimento, desligada por
+  padrão, pra conferir modelo/luz sem depender de pointer lock
+
+**Pendentes pra próxima sessão:**
+- [ ] Testar no navegador de verdade (`python3 -m http.server` dentro
+  de `projeto/` e abrir `interfaces/3d/index.html` via `localhost`,
+  não `file://`) — ainda não foi verificado visualmente depois desta
+  sessão
+- [ ] Som espacial (a versão 2D já tem as funções de áudio — avaliar
+  reaproveitar ou refazer com `THREE.PositionalAudio`)
+- [ ] Decidir como fica a transição entre salas em 3D — a porta já
+  calcula o destino certo (mesma função do 2D), mas o vão continua
+  bloqueado como obstáculo provisório (`bloqueioProvisorioDoVao` em
+  `cozinha.js`, isolado e nomeado de propósito) até o Corredor existir
+- [ ] Corredor como segunda sala 3D, seguindo a mesma assinatura de
+  `construirCozinha()` — primeiro caso real de troca de cena
