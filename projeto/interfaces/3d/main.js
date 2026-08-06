@@ -7,23 +7,22 @@
 // A porta já roda a mesma lógica condicional (obj.proxima) que decide
 // pra onde o jogador vai. Só ainda não existe uma sala 3D do outro lado
 // dela — isso é o próximo passo, não este.
-//
-// Posições dos objetos abaixo são um placeholder (dois "prateleiras" na
-// parede leste) só pra ter algo clicável no espaço 3D. A disposição
-// real da bancada é decisão de level design, não de engenharia — troque
-// o objeto POSICOES sem mexer no resto do arquivo.
 
 import * as THREE from "three";
 import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 
-// ---------- dimensões da sala (rascunho do PROGRESS.md, Sessão 2) ----------
-const LARGURA = 4.0;   // eixo X (parede leste/oeste)
-const PROFUNDIDADE = 3.2; // eixo Z (parede norte/sul)
-const PE_DIREITO = 2.6;   // eixo Y — ainda não confirmado, usando como padrão
+// ---------- dimensões da sala ----------
+// Aumentadas a partir de uma planta de cozinha real que o Diogo trouxe
+// como referência (4,28m x 3,28m) — bem maior que o rascunho anterior
+// (4,0 x 3,2), suficiente pra diferença ser perceptível andando.
+const LARGURA = 4.28;      // eixo X (parede leste/oeste)
+const PROFUNDIDADE = 3.28; // eixo Z (parede norte/sul)
+const PE_DIREITO = 2.6;    // eixo Y — ainda não confirmado, usando como padrão
 
-const META_X = LARGURA / 2;   // 2.0
-const META_Z = PROFUNDIDADE / 2; // 1.6
+const META_X = LARGURA / 2;
+const META_Z = PROFUNDIDADE / 2;
 const LARGURA_PORTA = 0.9;
+const PORTA_OFFSET_X = -0.9; // porta fora do centro da parede norte, como no sketch novo
 
 const SALA_ID = "cozinha";
 const salaData = window.DATA.salas[SALA_ID];
@@ -38,45 +37,93 @@ const COR_CLUSTER = {
   registro: 0x8a6d3b
 };
 
-// ---------- posições ----------
-// Redesenhado a partir de um sketch top-down do Diogo: bancada e
-// estante ficam nos DOIS CANTOS perto da porta (não espalhadas pela
-// parede inteira) — layout mais parecido com uma cozinha de verdade,
-// tudo concentrado perto da entrada.
+// ---------- bancada em L ----------
+// Layout v3, a partir do segundo sketch do Diogo (inspirado numa planta
+// de cozinha real): a bancada não fica mais num canto só — ela contorna
+// TRÊS paredes (parte da parede norte à direita da porta, a parede
+// leste inteira, parte da parede sul), como um balcão de verdade.
 //
-// Uma restrição que veio da própria narrativa, não de engenharia: o
-// gelo ("um ponto DA BANCADA está mais frio") não pode ir pro chão
-// sem contradizer a fala dele. Por isso só a mancha ficou no grupo
-// "chão" — os outros 15 objetos têm texto que já os amarra à bancada
-// ou à estante.
-const POSICOES = {
-  // bancada — canto nordeste, perto da porta (x=1.85, leste; z negativo = perto da porta norte)
-  faca:       { x: 1.85, y: 0.95, z: -1.55 },
-  tabua:      { x: 1.85, y: 0.95, z: -1.25 },
-  tesoura:    { x: 1.85, y: 0.95, z: -0.95 },
-  amolador:   { x: 1.85, y: 0.95, z: -0.65 },
-  espeto:     { x: 1.75, y: 0.95, z: -0.35, rotY: 0.35 }, // encostado, não deitado reto
-  garfo:      { x: 1.85, y: 1.35, z: -1.55 },
-  panela:     { x: 1.85, y: 1.35, z: -1.31 },
-  toalha:     { x: 1.85, y: 1.30, z: -1.07 },
-  pratovazio: { x: 1.85, y: 1.35, z: -0.83 },
-  copo:       { x: 1.85, y: 1.35, z: -0.59 },
-  gelo:       { x: 1.85, y: 1.35, z: -0.35 }, // fica na bancada — o texto exige isso
-  // estante — canto noroeste, perto da porta (x=-1.85, oeste), dois níveis
-  caderno:    { x: -1.85, y: 1.5, z: -1.2 },
-  etiqueta:   { x: -1.85, y: 1.5, z: -0.7 },
-  relogio:    { x: -1.85, y: 1.9, z: -1.2 },
-  camera:     { x: -1.85, y: 1.9, z: -0.7, rotY: -Math.PI / 2 }, // olhando pra bancada
-  // chão — único objeto cuja fala não o amarra a nenhuma superfície específica
-  mancha:     { x: 0, y: 0.01, z: 0.9, chao: true }
-};
+// Em vez de hardcodar x/z pra cada um dos 10 objetos que moram nela
+// (o que não escala — se o formato do balcão mudar de novo, seria
+// reescrever tudo à mão outra vez), a bancada é um CAMINHO (uma
+// polilinha) e os objetos são distribuídos uniformemente ao longo
+// dele. Mudar o formato da bancada = mudar CAMINHO_BANCADA, nada além
+// disso.
+const CAMINHO_BANCADA = [
+  { x: PORTA_OFFSET_X + LARGURA_PORTA / 2 + 0.25, z: -META_Z + 0.3 }, // logo à direita da porta
+  { x: META_X - 0.3, z: -META_Z + 0.3 },                              // canto nordeste
+  { x: META_X - 0.3, z: META_Z - 0.3 },                               // canto sudeste
+  { x: 0.1, z: META_Z - 0.3 }                                         // termina antes do centro da parede sul
+];
+
+function distribuirNoCaminho(pontos, n) {
+  const trechos = [];
+  let total = 0;
+  for (let i = 0; i < pontos.length - 1; i++) {
+    const a = pontos[i], b = pontos[i + 1];
+    const comprimento = Math.hypot(b.x - a.x, b.z - a.z);
+    trechos.push({ a, b, comprimento });
+    total += comprimento;
+  }
+  const resultado = [];
+  for (let i = 0; i < n; i++) {
+    // (i + 0.5) em vez de i: centraliza os objetos nos espaços entre
+    // as pontas do caminho, em vez de grudar um objeto bem na quina
+    let alvo = total * ((i + 0.5) / n);
+    for (const t of trechos) {
+      if (alvo <= t.comprimento || t === trechos[trechos.length - 1]) {
+        const f = t.comprimento === 0 ? 0 : alvo / t.comprimento;
+        resultado.push({
+          x: t.a.x + (t.b.x - t.a.x) * f,
+          z: t.a.z + (t.b.z - t.a.z) * f
+        });
+        break;
+      }
+      alvo -= t.comprimento;
+    }
+  }
+  return resultado;
+}
+
+// ---------- posições ----------
+// gelo e a fala dele ("um ponto DA BANCADA está mais frio") — por isso
+// ele continua preso à bancada e não pode virar objeto de chão.
+// pratovazio voltou a ficar isolado numa ilha central — com o cômodo
+// maior, cabe uma ilha de verdade no meio, igual à planta de referência
+// (e reforça de novo o "esperando algo que não veio").
+const OBJETOS_BANCADA = ["faca", "tabua", "tesoura", "amolador", "espeto", "garfo", "panela", "toalha", "copo", "gelo"];
+const pontosBancada = distribuirNoCaminho(CAMINHO_BANCADA, OBJETOS_BANCADA.length);
+
+const POSICOES = {};
+OBJETOS_BANCADA.forEach((id, i) => {
+  POSICOES[id] = { x: pontosBancada[i].x, y: 0.95, z: pontosBancada[i].z };
+});
+
+// estante — parede oeste inteira, uma fileira só (parede já é longa o
+// suficiente com o cômodo maior)
+const OBJETOS_ESTANTE = ["caderno", "etiqueta", "relogio", "camera"];
+const zEstante0 = -META_Z + 0.5, zEstante1 = META_Z - 0.5;
+OBJETOS_ESTANTE.forEach((id, i) => {
+  const z = zEstante0 + (zEstante1 - zEstante0) * (i / (OBJETOS_ESTANTE.length - 1));
+  POSICOES[id] = { x: -META_X + 0.15, y: 1.6, z };
+});
+POSICOES.camera.rotY = Math.PI / 2; // vira pra dentro do cômodo
+
+// ilha central
+POSICOES.pratovazio = { x: -0.3, y: 0.56, z: -0.2 };
+
+// chão — único objeto cuja fala não o amarra a nenhuma superfície
+POSICOES.mancha = { x: -0.9, y: 0.01, z: 0.5, chao: true };
 
 // ---------- cena, câmera, renderer ----------
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0908, 0.05); // reduzido — 0.12 escurecia demais um cômodo desse tamanho
+scene.fog = new THREE.FogExp2(0x0a0908, 0.045);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 50);
-camera.position.set(0, 1.6, META_Z - 0.3); // perto da parede sul, olhando pro norte
+// spawn: canto sudoeste, longe da porta e da bancada, perto da estante
+// — como no sketch (losango "spawn")
+camera.position.set(-META_X + 0.7, 1.6, META_Z - 0.6);
+camera.rotation.y = -0.6; // olhando em diagonal pro centro do cômodo, não reto pra parede
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
@@ -84,16 +131,18 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.prepend(renderer.domElement);
 
 // ---------- luz ----------
-// Primeira versão era "meia-luz" de verdade — bonita pro clima, mas
-// baixa demais pra dar pra avaliar o layout na prática. Subindo bastante
-// aqui; ajustar o clima fica pra quando o layout já estiver fechado.
+// Ainda na versão "clara demais de propósito" pra dar pra avaliar
+// layout — baixar de novo só quando o layout estiver fechado de vez.
 scene.add(new THREE.AmbientLight(0x55524a, 1.4));
-const luzCentral = new THREE.PointLight(0xffdca8, 2.2, 9, 1.6);
-luzCentral.position.set(0, PE_DIREITO - 0.2, 0);
+const luzCentral = new THREE.PointLight(0xffdca8, 2.4, 10, 1.6);
+luzCentral.position.set(-0.3, PE_DIREITO - 0.2, -0.1); // sobre a ilha
 scene.add(luzCentral);
-const luzBancada = new THREE.PointLight(0xfff2d8, 1.6, 7, 1.6);
-luzBancada.position.set(META_X - 0.6, 1.6, 0);
-scene.add(luzBancada);
+const luzBancadaNE = new THREE.PointLight(0xfff2d8, 1.6, 6, 1.6);
+luzBancadaNE.position.set(META_X - 0.6, 1.6, -META_Z + 0.6);
+scene.add(luzBancadaNE);
+const luzBancadaSE = new THREE.PointLight(0xfff2d8, 1.6, 6, 1.6);
+luzBancadaSE.position.set(META_X - 0.6, 1.6, META_Z - 0.6);
+scene.add(luzBancadaSE);
 const luzOeste = new THREE.PointLight(0xfff2d8, 1.2, 6, 1.6);
 luzOeste.position.set(-META_X + 0.6, 1.7, 0);
 scene.add(luzOeste);
@@ -118,18 +167,19 @@ addPlano(PROFUNDIDADE, PE_DIREITO, matParede, -META_X, PE_DIREITO / 2, 0, 0, Mat
 addPlano(PROFUNDIDADE, PE_DIREITO, matParede, META_X, PE_DIREITO / 2, 0, 0, -Math.PI / 2);   // leste
 addPlano(LARGURA, PE_DIREITO, matParede, 0, PE_DIREITO / 2, META_Z, 0, Math.PI);             // sul
 
-// parede norte com vão de porta: dois segmentos + verga
-const larguraSegmento = (LARGURA - LARGURA_PORTA) / 2;
-addPlano(larguraSegmento, PE_DIREITO, matParede, -(LARGURA_PORTA / 2 + larguraSegmento / 2), PE_DIREITO / 2, -META_Z, 0, 0);
-addPlano(larguraSegmento, PE_DIREITO, matParede, (LARGURA_PORTA / 2 + larguraSegmento / 2), PE_DIREITO / 2, -META_Z, 0, 0);
-addPlano(LARGURA_PORTA, PE_DIREITO - 2.0, matParede, 0, PE_DIREITO - (PE_DIREITO - 2.0) / 2, -META_Z, 0, 0); // verga
+// parede norte com vão de porta fora do centro (PORTA_OFFSET_X)
+const vaoEsq = PORTA_OFFSET_X - LARGURA_PORTA / 2 - (-META_X); // largura do segmento à esquerda da porta
+const vaoDir = META_X - (PORTA_OFFSET_X + LARGURA_PORTA / 2);  // largura do segmento à direita da porta
+addPlano(vaoEsq, PE_DIREITO, matParede, -META_X + vaoEsq / 2, PE_DIREITO / 2, -META_Z, 0, 0);
+addPlano(vaoDir, PE_DIREITO, matParede, META_X - vaoDir / 2, PE_DIREITO / 2, -META_Z, 0, 0);
+addPlano(LARGURA_PORTA, PE_DIREITO - 2.0, matParede, PORTA_OFFSET_X, PE_DIREITO - (PE_DIREITO - 2.0) / 2, -META_Z, 0, 0); // verga
 
 // porta em si — leve entreaberta, como no texto da versão 2D
 const portaMesh = new THREE.Mesh(
   new THREE.BoxGeometry(LARGURA_PORTA - 0.1, 2.0, 0.05),
   new THREE.MeshStandardMaterial({ color: 0x0d0c0a, roughness: 0.8 })
 );
-portaMesh.position.set(-0.15, 1.0, -META_Z + 0.05);
+portaMesh.position.set(PORTA_OFFSET_X - 0.15, 1.0, -META_Z + 0.05);
 portaMesh.rotation.y = 0.35; // entreaberta
 portaMesh.userData = { tipo: "porta", ref: porta };
 scene.add(portaMesh);
@@ -154,29 +204,42 @@ objetos.forEach((o) => {
   mesh.position.set(p.x, p.y, p.z);
   if (p.chao) mesh.rotation.x = -Math.PI / 2; // decalque deitado no chão
   if (p.rotY) mesh.rotation.y = p.rotY;
-  // decalque no chão não brilha por cima de si mesmo (sem emissive) —
-  // usa leve elevação de cor ao ser examinado em vez de emissive
   mesh.userData = { tipo: "objeto", ref: o, decalque: !!p.chao };
   scene.add(mesh);
   interativos.push(mesh);
 });
 
-// bancada — canto nordeste, perto da porta (não a parede inteira)
-const bancada = new THREE.Mesh(
-  new THREE.BoxGeometry(0.5, 0.85, 1.4),
-  new THREE.MeshStandardMaterial({ color: 0x22201c, roughness: 0.85 })
-);
-bancada.position.set(META_X - 0.3, 0.425, -0.95);
-scene.add(bancada);
+// bancada física — três segmentos de balcão seguindo o mesmo CAMINHO_BANCADA
+// (norte-direita, leste inteira, sul-direita), pra não ficar só cubos
+// flutuando sem apoio visual
+const matBancada = new THREE.MeshStandardMaterial({ color: 0x22201c, roughness: 0.85 });
+function addSegmentoBancada(a, b) {
+  const comprimento = Math.hypot(b.x - a.x, b.z - a.z);
+  const angulo = Math.atan2(b.x - a.x, b.z - a.z);
+  const segMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.85, comprimento + 0.3), matBancada);
+  segMesh.position.set((a.x + b.x) / 2, 0.425, (a.z + b.z) / 2);
+  segMesh.rotation.y = angulo;
+  scene.add(segMesh);
+}
+for (let i = 0; i < CAMINHO_BANCADA.length - 1; i++) {
+  addSegmentoBancada(CAMINHO_BANCADA[i], CAMINHO_BANCADA[i + 1]);
+}
 
-// estante — canto noroeste, perto da porta, dois níveis (prateleiras)
-const matPrateleira = new THREE.MeshStandardMaterial({ color: 0x22201c, roughness: 0.85 });
-const prateleiraBaixa = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 1.0), matPrateleira);
-prateleiraBaixa.position.set(-META_X + 0.15, 1.45, -0.95);
-scene.add(prateleiraBaixa);
-const prateleiraAlta = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 1.0), matPrateleira);
-prateleiraAlta.position.set(-META_X + 0.15, 1.85, -0.95);
-scene.add(prateleiraAlta);
+// estante — parede oeste inteira
+const prateleira = new THREE.Mesh(
+  new THREE.BoxGeometry(0.06, 0.04, zEstante1 - zEstante0 + 0.4),
+  matBancada
+);
+prateleira.position.set(-META_X + 0.15, 1.5, (zEstante0 + zEstante1) / 2);
+scene.add(prateleira);
+
+// ilha central
+const ilha = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.4, 0.35, 0.5, 20),
+  new THREE.MeshStandardMaterial({ color: 0x1e1c19, roughness: 0.8 })
+);
+ilha.position.set(-0.3, 0.25, -0.2);
+scene.add(ilha);
 
 // ---------- movimento em 1ª pessoa ----------
 const controls = new PointerLockControls(camera, renderer.domElement);
@@ -209,7 +272,7 @@ function mover(delta) {
   if (dir.lengthSq() > 0) dir.normalize().multiplyScalar(VELOCIDADE * delta);
 
   const alvo = camera.position.clone().add(dir);
-  // colisão simples: clamp dentro dos limites da sala (sem checar a bancada ainda)
+  // colisão simples: clamp dentro dos limites da sala (sem checar bancada/ilha ainda)
   alvo.x = THREE.MathUtils.clamp(alvo.x, -META_X + MARGEM_PAREDE, META_X - MARGEM_PAREDE);
   alvo.z = THREE.MathUtils.clamp(alvo.z, -META_Z + MARGEM_PAREDE, META_Z - MARGEM_PAREDE);
   camera.position.x = alvo.x;
