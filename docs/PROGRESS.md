@@ -67,13 +67,13 @@ com o mesmo DATA, sem divergência real implementada). Seguir só com o
       porta com a lógica condicional já existente). As demais salas
       viram repetição do mesmo padrão.
 
-## Estado atual (06/08/2026)
+## Estado atual (08/08/2026)
 
-Fase 2 (Three.js) com a Cozinha tecnicamente fechada: texturas,
-modelos reais dos 16 objetos, colisão contra móveis/paredes e
-iluminação final — ver Sessão 13. Falta testar no navegador, som
-espacial, e o Corredor (segunda sala 3D, prova real de troca de
-cena). Ver "Pendentes" no fim da Sessão 13 pra lista completa.
+Tudo da Cozinha confirmado funcionando no navegador: mesa retangular,
+reorganização dos objetos por estação, correção de colisão na quina
+(bug de navegação resolvido) e o contorno via `OutlinePass`. Próximos
+passos em aberto: som espacial, e as 4 salas finais (A-D) + relatório
+— ainda só existem no 2D.
 
 ## Log de sessões
 
@@ -405,3 +405,165 @@ assinatura — a troca de sala acontece num lugar só.
   `cozinha.js`, isolado e nomeado de propósito) até o Corredor existir
 - [ ] Corredor como segunda sala 3D, seguindo a mesma assinatura de
   `construirCozinha()` — primeiro caso real de troca de cena
+
+### 06/08/2026 — Sessão 14 (Claude — Corredor + troca de sala real)
+
+`main.js` deixou de ser "uma sala fixa" e virou um orquestrador: existe
+agora um registro `SALAS_3D = { cozinha, corredor }` e uma função
+`entrarEm(id)` que descarta tudo que a sala anterior pôs na cena
+(geometria + material + textura, via `traverse` + `dispose`, pra não
+vazar memória de GPU a cada ida e volta), constrói a próxima sala,
+reposiciona a câmera no `spawn` dela e zera a inclinação de cabeça
+herdada. Clicar na porta agora chama `entrarEm(destino)` de verdade
+quando o destino calculado está no registro; quando não está (salaA-D,
+relatorio, relatorioApressado — ainda só existem no 2D), continua
+mostrando só o texto de sempre, sem vazar o destino calculado pro
+jogador (isso só vai pro console, pra depuração).
+
+- **`corredor.js` (novo)** — segunda sala 3D, mesma assinatura de
+  `construirCozinha(scene, ctx)`. Não tem os 16 objetos da Cozinha —
+  `window.DATA.salas.corredor` só define a porta de saída — então a
+  decisão aqui foi só arquitetura/atmosfera:
+  - **Traçado levemente torto**: dois trechos retos com ~14° de quebra
+    no meio, não reto (sem graça) nem 90° (esquina óbvia, fácil de
+    memorizar). A ideia é dar pra sentir que virou sem conseguir
+    apontar exatamente onde, reforçando "será que é o mesmo corredor?"
+  - **Mais estreito e mais baixo que a Cozinha** (1,15m de largura,
+    2,35m de pé-direito contra 2,70m) — aperta sem precisar dizer que
+    aperta
+  - **Metal, não madeira/pedra** — léxico construtivo diferente da
+    Cozinha de propósito, pra marcar que é passagem institucional, não
+    cômodo
+  - **Porta de saída com detalhe que muda a cada visita**: ângulo de
+    entreaberta e deslocamento no batente variam por um hash
+    determinístico com seed = número de visitas anteriores ao Corredor
+    (mesma visita sempre dá o mesmo resultado, visitas diferentes dão
+    resultados diferentes) — a variação é pequena o bastante pra não
+    virar mecânica, só atmosfera
+  - **Porta de entrada decorativa** — a porta da Cozinha vista de trás
+    ("atrás de você", como diz `dados.js`), fechada e sem
+    `userData.tipo`, então o raycast nunca acha ela
+  - Correção no meio do caminho: o primeiro cálculo do bloqueio de
+    colisão do vão assumia parede alinhada ao eixo (copiado direto do
+    padrão da Cozinha) — quebrava pro segundo trecho, que está em
+    ângulo. Trocado por uma fórmula de AABB de retângulo rotacionado de
+    verdade (`bloqueioVao`)
+- **Spawn ajustado** depois de notar que a distância original (0,55m
+  da porta de entrada) deixava o raio de colisão do jogador quase
+  encostando no bloqueio do vão — foi pra 0,8m, com folga de verdade
+
+**Pendentes pra próxima sessão:**
+- [ ] Testar no navegador (Cozinha, Corredor, e a transição entre as
+  duas nos dois sentidos) — nada disso foi verificado visualmente
+- [ ] Som espacial
+- [ ] As 4 salas finais (salaA-D) e o relatório — ainda só existem no
+  2D; a porta da Cozinha já sabe calcular o destino certo, só falta a
+  geometria
+
+### 07/08/2026 — Sessão 15 (Claude — primeiro teste real + 5 ajustes)
+
+Diogo testou a Cozinha no navegador pela primeira vez (Chrome, arquivo
+local) — funcionou. A partir do feedback desse teste, e de uma planta
+que ele desenhou à mão, cinco mudanças:
+
+- **Mesa retangular no lugar da ilha redonda** (`cozinha.js`) —
+  posição validada por simulação antes de escrever qualquer geometria:
+  um flood-fill numa grade de 5cm, reaproveitando as funções reais de
+  `colisao.js` (não uma reimplementação separada), confirmou que a
+  área livre da sala continua sendo uma região só, com a mesa em
+  `(-0,25; 0)`, 1,0×0,65m, ~1m de corredor livre pro lado leste e
+  ~0,7m pros lados norte/sul. Pernas nos quatro cantos (recuadas 8cm),
+  não mais um pedestal central — pedestal fazia sentido pra ilha,
+  não pra mesa de jantar. Caixa no lugar de cilindro na colisão.
+- **Bug relatado — "entra por um lado, não sai pelo outro"**:
+  investigado por simulação antes de mexer em qualquer número. Rodei
+  o mesmo flood-fill na ilha redonda ANTIGA e na mesa retangular NOVA:
+  nos dois casos a sala é uma região só, sem bolsão isolado — não é um
+  buraco de colisão. A hipótese mais provável é `resolverMovimento`
+  testando os eixos X e Z em sequência (ótimo pra deslizar pela
+  parede, mas sensível à ORDEM perto de uma quina apertada — os dois
+  eixos podem falhar separadamente mesmo com o ponto diagonal livre).
+  Corrigido em `colisao.js`: quando os dois eixos travam sozinhos, um
+  fallback testa o movimento diagonal direto contra a posição
+  original. Mudança pequena e sem risco pro resto (só entra em ação
+  nesse caso específico). **Não foi possível confirmar no navegador**
+  — fica pra validar na próxima sessão de teste.
+- **Objetos da bancada reorganizados por estação real**
+  (`GRUPOS_BANCADA`), não mais pela ordem do cluster narrativo (que
+  segue decidindo o final em `dados.js`, sem mudar nada): estação de
+  corte (faca, tábua, tesoura, amolador, espeto) → mesa posta/serviço
+  (panela, garfo, toalha, copo) → o ponto frio sozinho no fim do
+  balcão (gelo, isolado de propósito — a fala dele já é sobre ser uma
+  anomalia sem explicação). `distribuirNoCaminho` virou
+  `distribuirGrupos`: agora existe um respiro (peso 1,4× um objeto)
+  entre grupos, não só a ordem mudando — sem isso, reagrupar no array
+  não alteraria a distância visual entre nada.
+- **Aura no hover** substituindo o antigo feedback (mira com blur/
+  escala no CSS): uma `THREE.PointLight` quente, reposicionada no
+  objeto mirado a cada frame, com intensidade suavizada (nunca em
+  degrau) em vez de ligar/desligar. Vive fora do Group da sala —
+  sobrevive à troca de cena, senão `limparSala()` apagaria ela.
+- **Transição fade + passo** entre portas, no lugar do corte seco:
+  a câmera avança 0,35m na direção que já olhava enquanto a tela
+  escurece (220ms), troca a sala no ponto mais escuro, clareia do
+  outro lado. Rodando dentro do loop de render (não `setTimeout`) pra
+  nunca dessincronizar do pointer lock. Clique duplo durante a
+  transição é ignorado.
+- **Refatoração de suporte**: `entrarEm()` agora dá a cada sala um
+  `THREE.Group` próprio (em vez de escrever direto na `scene`) —
+  necessário pra `limparSala()` não apagar a luz da aura, que precisa
+  sobreviver à troca. `cozinha.js`/`corredor.js` não mudaram nada por
+  causa disso (o parâmetro ainda se chama `scene` neles; só quem
+  chama passou a mandar um Group em vez da cena inteira).
+
+**Pendentes pra próxima sessão:**
+- [ ] Testar tudo no navegador — mesa, reorganização dos objetos,
+  aura, transição, e principalmente confirmar se o fallback diagonal
+  resolveu o bug relatado de navegação
+- [ ] Som espacial
+- [ ] As 4 salas finais (salaA-D) e o relatório
+
+### 08/08/2026 — Sessão 16 (Claude — contorno de verdade no hover)
+
+Diogo testou no navegador: a transição fade+passo entre Cozinha e
+Corredor já ficou melhor. Mas a "aura" da Sessão 15 (uma
+`PointLight` posicionada no objeto) não era o que ele queria — ele
+mostrou print comparando o que saiu com o que esperava: não uma luz
+iluminando a superfície ao redor de forma desigual, e sim um contorno
+desenhado ao redor da silhueta do próprio objeto. Antes de mexer em
+qualquer código, ele pediu sugestões — então foram levantadas duas
+abordagens (`OutlinePass` via pós-processamento vs. casca invertida
+sem tocar no pipeline de render) com os trade-offs de cada uma; ele
+escolheu `OutlinePass`.
+
+Trocado o feedback de hover inteiro:
+- `renderer.render(scene, camera)` virou `composer.render()` — agora
+  existe um `EffectComposer` com `RenderPass` → `OutlinePass` →
+  `OutputPass`. O render target do composer usa `samples: 4`
+  (multisample manual), porque sem isso o `antialias: true` do
+  renderer não chega no resultado final — o composer desenha pra um
+  buffer próprio, e as quinas de TUDO (não só do contorno) voltariam a
+  serrilhar.
+- `OutlinePass` configurado pra afordância, não alerta: sem pulso
+  (`pulsePeriod = 0`), contorno branco (`visibleEdgeColor`), um pouco
+  de `edgeGlow` (0,25) pra não ficar com cara de linha de UI dura.
+- A luz da aura (`PointLight`) e sua suavização por frame saíram
+  inteiras; `atualizarContorno()` só troca
+  `outlinePass.selectedObjects` entre `[alvo]` e `[]` — mais simples
+  que antes, porque o próprio `OutlinePass` já cuida do glow da borda.
+- `OutputPass` no fim da cadeia é obrigatório aqui: sem ele o tone
+  mapping (ACESFilmic) e a conversão de espaço de cor do renderer não
+  se aplicam ao resultado do composer.
+- `__inspecao.olhar()` e o resize handler atualizados pra usar o
+  composer também (`composer.setSize` + `outlinePass.resolution.set`).
+
+**Pendentes pra próxima sessão:**
+- [x] Testar no navegador — contorno e reorganização dos objetos
+  confirmados funcionando
+- [x] Mesa retangular confirmada — posicionamento melhorou
+- [x] Bug de navegação confirmado corrigido — o fallback diagonal em
+  `resolverMovimento` resolveu
+- [ ] Som espacial
+- [ ] As 4 salas finais (salaA-D) e o relatório
+
+

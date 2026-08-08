@@ -22,18 +22,21 @@
     background: radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,.72) 100%);
   }
 
-  /* A mira reage à possibilidade de examinar — nunca ao que já foi
-     examinado. É afordância, não progresso. */
+  /* A mira é fixa — reagir ao hover virou trabalho da aura no próprio
+     objeto (ver main.js), não mais do cursor. */
   #mira {
     position: fixed; top: 50%; left: 50%; width: 5px; height: 5px;
     margin: -2.5px 0 0 -2.5px; border-radius: 50%;
     background: var(--tinta); opacity: .32;
-    transition: opacity .18s ease, transform .18s ease, box-shadow .18s ease;
     pointer-events: none; z-index: 3;
   }
-  #mira.ativa {
-    opacity: .9; transform: scale(2.1);
-    box-shadow: 0 0 0 1px rgba(216,208,192,.35);
+
+  /* Fade da transição entre salas. Opacidade é controlada por JS,
+     quadro a quadro (main.js) — não por transition CSS — pra nunca
+     dessincronizar do momento exato da troca de cena. */
+  #transicao {
+    position: fixed; inset: 0; z-index: 5;
+    background: var(--fundo); opacity: 0; pointer-events: none;
   }
 
   #hud {
@@ -97,6 +100,7 @@
   <div id="vinheta"></div>
   <div id="mira"></div>
   <div id="hud" aria-live="polite"></div>
+  <div id="transicao"></div>
 
   <script src="../../core/dados.js"></script>
   <script src="../../core/estado.js"></script>

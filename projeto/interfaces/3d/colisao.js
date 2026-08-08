@@ -89,10 +89,27 @@ export function resolverMovimento(atual, passo, obstaculos, raio = RAIO_JOGADOR)
   let z = atual.z
 
   const tentativaX = x + passo.x
-  if (!obstaculos.some((o) => colide(o, tentativaX, z, raio))) x = tentativaX
+  const xLivre = !obstaculos.some((o) => colide(o, tentativaX, z, raio))
+  if (xLivre) x = tentativaX
 
   const tentativaZ = z + passo.z
-  if (!obstaculos.some((o) => colide(o, x, tentativaZ, raio))) z = tentativaZ
+  const zLivre = !obstaculos.some((o) => colide(o, x, tentativaZ, raio))
+  if (zLivre) z = tentativaZ
+
+  // Se os dois eixos travaram separadamente — mas o ponto diagonal (os
+  // dois deslocamentos juntos, a partir da posição ORIGINAL) está
+  // livre — o jogador ficaria parado numa quina mesmo tendo pra onde
+  // ir. Testar X e depois Z em sequência é sensível à ORDEM perto de
+  // cantos apertados (a quina do balcão em L é o caso real). Isso só
+  // entra em ação nesse caso raro; não muda nada do deslizar normal.
+  if (!xLivre && !zLivre) {
+    const diagX = atual.x + passo.x
+    const diagZ = atual.z + passo.z
+    if (!obstaculos.some((o) => colide(o, diagX, diagZ, raio))) {
+      x = diagX
+      z = diagZ
+    }
+  }
 
   return { x, z }
 }
