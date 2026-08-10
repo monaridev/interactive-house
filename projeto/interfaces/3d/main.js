@@ -21,16 +21,18 @@ import { OutlinePass } from "three/addons/postprocessing/OutlinePass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js"
 import { construirCozinha } from "./cozinha.js"
 import { construirCorredor } from "./corredor.js"
+import { construirSalaA } from "./sala-a.js"
 import { resolverMovimento, desencaixar } from "./colisao.js"
 
 // ---------- registro de salas 3D ----------
 // Quando a porta calcula um destino que está aqui, a troca é real
-// (nova geometria, câmera reposicionada). Quando não está (salaA-D,
+// (nova geometria, câmera reposicionada). Quando não está (salaB-D,
 // relatorio, relatorioApressado — ainda só existem no 2D), a porta só
 // mostra o texto de sempre, sem sala nenhuma pra ir.
 const SALAS_3D = {
   cozinha: construirCozinha,
   corredor: construirCorredor,
+  salaA: construirSalaA,
 }
 
 // ---------- cena ----------
@@ -410,7 +412,7 @@ renderer.domElement.addEventListener("click", () => {
     if (SALAS_3D[destino]) {
       iniciarTransicao(destino)
     } else {
-      // Ainda não existe em 3D (salaA-D, relatorio, relatorioApressado)
+      // Ainda não existe em 3D (salaB-D, relatorio, relatorioApressado)
       // — mesma mensagem de sempre, sem vazar o destino calculado pro
       // jogador (isso é só pra depuração, no console).
       escrever("PORTA", "Está entreaberta. Não cede.")

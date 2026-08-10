@@ -613,3 +613,63 @@ jogador como mais uma pista ambiental.
 **Próxima sessão sugerida:** iniciar a geometria das quatro salas de desfecho
 seguindo o contrato atual de descritor de sala (`obstaculos`, `interativos`,
 `spawn`, `fonteSom`) e conectar os destinos que a porta da Cozinha já calcula.
+
+### 10/08/2026 — Sessão 18 (v0 — Ambiente A em 3D)
+
+A construção das salas alternativas começou de forma incremental, uma por
+sessão, para permitir testes isolados antes de avançar. O primeiro destino
+implementado foi o Ambiente A: um corredor metálico estreito, industrial e
+frio, preservando o conteúdo narrativo já definido em `dados.js`.
+
+- **Novo módulo de sala** (`sala-a.js`) — criado um construtor independente
+  seguindo o mesmo contrato usado pela Cozinha e pelo Corredor: `obstaculos`,
+  `interativos`, `porta`, `spawn`, `limites`, `fonteSom` e `data`.
+- **Arquitetura industrial** — modelado um corredor metálico estreito com
+  piso em placas, paredes segmentadas, teto baixo, calhas de iluminação e
+  uma porta de saída ao fundo. A composição mantém uma faixa central livre
+  para navegação e concentra as pistas nas laterais.
+- **Quatro pistas interativas** — marcas de corte na parede, ralo no piso,
+  ferramenta caída e vestígios antigos foram representados fisicamente e
+  conectados aos quatro objetos narrativos do Ambiente A. Cada pista recebe
+  o `userData.ref` correto, funciona com raycasting e participa do contorno
+  de seleção já existente.
+- **Colisões dedicadas** — paredes laterais, limites frontal e traseiro e
+  porta foram registrados como obstáculos, reutilizando integralmente
+  `resolverMovimento` e `desencaixar`, sem criar lógica paralela.
+- **Integração ao roteamento** (`main.js`) — `construirSalaA` foi importado e
+  registrado em `SALAS_3D`. Quando os quatro instrumentos da Cozinha foram
+  examinados, a porta agora conduz de fato para `salaA`, com nova geometria,
+  câmera reposicionada e descrição temporária da sala.
+- **Porta final preservada** — a saída do Ambiente A continua apontando para
+  `relatorio`, ainda não implementado em 3D. Até essa etapa existir, o motor
+  mantém o comportamento seguro de apresentar a descrição da porta sem
+  trocar para uma sala inexistente.
+- **Som espacial** — o Ambiente A ganhou uma origem própria para o zumbido,
+  posicionada atrás da parede lateral próxima ao ralo. O áudio continua
+  sendo a mesma presença recorrente, mas pode ser localizado dentro da nova
+  geometria.
+- **Iluminação calibrada** — combinada luz hemisférica fria com três pontos
+  industriais e luminárias emissivas. A primeira versão ficou escura demais
+  por causa da resposta dos materiais metálicos; intensidades e preenchimento
+  foram ajustados após inspeção visual, preservando intervalos de sombra.
+- **Orientação corrigida** — o ângulo inicial da câmera foi ajustado para que
+  o jogador entre olhando ao longo do corredor, em direção à porta final.
+- **Validação** — `pnpm build` concluído sem erros; carregamento direto da
+  sala, quantidade e IDs dos quatro interativos, colisores, destino da porta,
+  fonte sonora, HUD de entrada, iluminação e ausência de erros no console
+  foram verificados no navegador com WebGL habilitado.
+
+**Estado ao fim da sessão:**
+- [x] Ambiente A disponível em 3D
+- [x] Rota Cozinha → Ambiente A funcional após examinar os quatro instrumentos
+- [x] Quatro pistas narrativas interativas com OutlinePass e HUD de 5 segundos
+- [x] Colisões, iluminação e som espacial próprios
+- [x] Porta de saída preparada para o futuro relatório
+- [ ] Ambiente B em 3D
+- [ ] Ambiente C em 3D
+- [ ] Ambiente D em 3D
+- [ ] Relatório e encerramento em 3D
+
+**Próxima sessão sugerida:** construir apenas o Ambiente B, mantendo o mesmo
+processo incremental: geometria isolada, pistas narrativas, colisões, som,
+integração da rota correspondente e validação completa antes do Ambiente C.
