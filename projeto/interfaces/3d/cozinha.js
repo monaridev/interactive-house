@@ -537,6 +537,9 @@ export function construirCozinha(scene) {
     interativos,
     // spawn: canto sudoeste, longe da porta e da bancada, de frente pro cômodo
     spawn: { x: -META_X + 0.75, y: 1.65, z: META_Z - 0.75, olharY: -0.75 },
+    // O zumbido parece vir de dentro da parede leste, perto do trecho
+    // anormalmente frio da bancada. A fonte fica além da face visível.
+    fonteSom: { x: META_X + 0.18, y: 0.48, z: META_Z - 0.62 },
     limites: { peDireito: PE_DIREITO },
   }
 }

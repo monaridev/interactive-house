@@ -39,15 +39,41 @@
     background: var(--fundo); opacity: 0; pointer-events: none;
   }
 
+  /* Notificação de campo: um painel de levantamento, não uma legenda
+     permanente. Toda mensagem entra, permanece legível por 5s e some. */
   #hud {
-    position: fixed; left: 24px; bottom: 24px; max-width: 46ch;
+    position: fixed; left: 24px; bottom: 24px; width: min(390px, calc(100vw - 48px));
+    box-sizing: border-box; padding: 14px 16px 15px;
+    border: 1px solid rgba(216, 208, 192, .42); border-radius: 3px;
+    background: rgba(8, 8, 10, .86); backdrop-filter: blur(6px);
+    box-shadow: 0 10px 32px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255,255,255,.025);
     font-family: "Courier New", ui-monospace, monospace;
-    font-size: 14px; line-height: 1.6; letter-spacing: .01em;
-    color: var(--tinta); text-shadow: 0 1px 4px #000, 0 0 18px rgba(0,0,0,.9);
-    pointer-events: none; white-space: pre-wrap; z-index: 3;
+    color: var(--tinta); pointer-events: none; z-index: 3;
+    opacity: 0; transform: translateY(8px); visibility: hidden;
+    transition: opacity .28s ease, transform .28s ease, visibility 0s linear .28s;
   }
-  #hud.surgindo { animation: surgir .32s ease-out; }
-  @keyframes surgir { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  #hud.visivel {
+    opacity: 1; transform: none; visibility: visible;
+    transition: opacity .28s ease, transform .28s ease;
+  }
+  #hud::before {
+    content: "OBJETO — NOTIF."; display: block; margin-bottom: 8px;
+    font-size: 10px; letter-spacing: .18em; color: var(--tinta-fraca);
+  }
+  #hud-titulo {
+    display: block; margin: 0 0 5px; font-size: 12px;
+    line-height: 1.35; letter-spacing: .12em; color: var(--tinta);
+  }
+  #hud-texto {
+    display: block; margin: 0; font-size: 14px;
+    line-height: 1.55; letter-spacing: .01em; color: var(--tinta);
+  }
+  @media (max-width: 520px) {
+    #hud { left: 16px; bottom: 16px; width: calc(100vw - 32px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #hud, #hud.visivel { transition: none; }
+  }
 
   #capa {
     position: fixed; inset: 0; z-index: 10;
@@ -99,7 +125,10 @@
 
   <div id="vinheta"></div>
   <div id="mira"></div>
-  <div id="hud" aria-live="polite"></div>
+  <aside id="hud" role="status" aria-live="polite" aria-atomic="true">
+    <strong id="hud-titulo"></strong>
+    <span id="hud-texto"></span>
+  </aside>
   <div id="transicao"></div>
 
   <script src="../../core/dados.js"></script>

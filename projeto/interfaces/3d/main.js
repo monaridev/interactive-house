@@ -167,6 +167,10 @@ const raycaster = new THREE.Raycaster()
 const ALCANCE = 2.1
 const centro = new THREE.Vector2(0, 0)
 const hud = document.getElementById("hud")
+const hudTitulo = document.getElementById("hud-titulo")
+const hudTexto = document.getElementById("hud-texto")
+const DURACAO_NOTIFICACAO = 5000
+let temporizadorHud = null
 
 // Os modelos agora são Groups com várias peças (lâmina, cabo, ilhó...),
 // então o raycast tem que ser recursivo e depois SUBIR até o grupo que
@@ -191,15 +195,80 @@ function descreverSala() {
     : d
 }
 
-let mensagemAtual = ""
-function escrever(texto) {
-  mensagemAtual = texto
-  hud.textContent = texto
-  hud.classList.remove("surgindo")
-  // força reflow pra reiniciar a animação mesmo em cliques seguidos
+function escrever(titulo, texto) {
+  clearTimeout(temporizadorHud)
+  hudTitulo.textContent = titulo
+  hudTexto.textContent = texto
+  hud.classList.remove("visivel")
+  // força reflow pra reiniciar a entrada mesmo em cliques seguidos
   void hud.offsetWidth
-  hud.classList.add("surgindo")
+  hud.classList.add("visivel")
+  temporizadorHud = setTimeout(() => hud.classList.remove("visivel"), DURACAO_NOTIFICACAO)
 }
+
+// ---------- zumbido espacial ----------
+// O som não é uma trilha estéreo fixa: nasce de um ponto físico da sala.
+// O jogador pode localizá-lo girando a cabeça e aproximando-se da fonte.
+let audio = null
+const frenteAudio = new THREE.Vector3()
+
+function iniciarAudio() {
+  if (audio) {
+    if (audio.context.state === "suspended") audio.context.resume()
+    return
+  }
+
+  const AudioContexto = window.AudioContext || window.webkitAudioContext
+  if (!AudioContexto) return
+  const context = new AudioContexto()
+  const panner = new PannerNode(context, {
+    panningModel: "HRTF",
+    distanceModel: "inverse",
+    refDistance: 0.5,
+    maxDistance: 12,
+    rolloffFactor: 1.35,
+  })
+  const filtro = new BiquadFilterNode(context, { type: "lowpass", frequency: 180, Q: 1.2 })
+  const ganho = new GainNode(context, { gain: 0.035 })
+  filtro.connect(panner).connect(ganho).connect(context.destination)
+
+  // Duas frequências próximas produzem uma pulsação orgânica, mas estável:
+  // parece equipamento elétrico atrás da arquitetura, não música ambiente.
+  for (const frequencia of [57, 61.5]) {
+    const oscilador = new OscillatorNode(context, { type: "sine", frequency: frequencia })
+    const volume = new GainNode(context, { gain: frequencia === 57 ? 0.7 : 0.3 })
+    oscilador.connect(volume).connect(filtro)
+    oscilador.start()
+  }
+
+  audio = { context, panner }
+  atualizarFonteAudio()
+}
+
+function atualizarFonteAudio() {
+  if (!audio || !sala?.fonteSom) return
+  const { x, y, z } = sala.fonteSom
+  audio.panner.positionX.value = x
+  audio.panner.positionY.value = y
+  audio.panner.positionZ.value = z
+}
+
+function atualizarOuvinte() {
+  if (!audio) return
+  const listener = audio.context.listener
+  camera.getWorldDirection(frenteAudio)
+  listener.positionX.value = camera.position.x
+  listener.positionY.value = camera.position.y
+  listener.positionZ.value = camera.position.z
+  listener.forwardX.value = frenteAudio.x
+  listener.forwardY.value = frenteAudio.y
+  listener.forwardZ.value = frenteAudio.z
+  listener.upX.value = camera.up.x
+  listener.upY.value = camera.up.y
+  listener.upZ.value = camera.up.z
+}
+
+capa.addEventListener("click", iniciarAudio)
 
 // ---------- troca de sala ----------
 // Descarta tudo que a sala anterior pôs na cena — geometria E material/
@@ -246,7 +315,8 @@ function entrarEm(id) {
   camera.position.z = pos.z
 
   Estado.registrarVisita(sala.id)
-  escrever(descreverSala())
+  atualizarFonteAudio()
+  escrever(sala.data.titulo.toUpperCase(), descreverSala())
 }
 
 entrarEm("cozinha")
@@ -321,7 +391,7 @@ renderer.domElement.addEventListener("click", () => {
     Estado.registrarClique(sala.id, ref.id)
     const ja = Estado.clicadosDe(sala.id)
     const texto = typeof ref.fala === "function" ? ref.fala(ja) : ref.fala
-    escrever(`${ref.nome.toUpperCase()}\n${texto}`)
+    escrever(ref.nome.toUpperCase(), texto)
     // Nada de emissive marcando "já examinado", e nada de contador X/16.
     // O sistema não dá feedback de progresso — quem quiser saber o que já
     // olhou tem que lembrar. É a regra 1 de WORLD_DESIGN ("nunca confirmar")
@@ -343,7 +413,7 @@ renderer.domElement.addEventListener("click", () => {
       // Ainda não existe em 3D (salaA-D, relatorio, relatorioApressado)
       // — mesma mensagem de sempre, sem vazar o destino calculado pro
       // jogador (isso é só pra depuração, no console).
-      escrever(`PORTA\nEstá entreaberta. Não cede.`)
+      escrever("PORTA", "Está entreaberta. Não cede.")
     }
   }
 })
@@ -387,6 +457,7 @@ function animar() {
     mover(delta)
     atualizarContorno()
   }
+  atualizarOuvinte()
   composer.render()
 }
 animar()

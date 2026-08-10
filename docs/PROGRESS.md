@@ -566,4 +566,50 @@ Trocado o feedback de hover inteiro:
 - [ ] Som espacial
 - [ ] As 4 salas finais (salaA-D) e o relatório
 
+### 10/08/2026 — Sessão 17 (v0 — som espacial + HUD temporário)
 
+O zumbido recorrente deixou de funcionar como áudio ambiente sem direção e
+passou a existir fisicamente dentro do espaço. A intenção narrativa foi
+preservada: a origem não é explicada, mas agora pode ser procurada pelo
+jogador como mais uma pista ambiental.
+
+- **Som espacial sintetizado** (`main.js`) — criada uma fonte contínua via
+  Web Audio API, sem arquivo externo: dois osciladores senoidais próximos
+  (57 Hz e 61,5 Hz) produzem uma pulsação elétrica discreta, filtrada por
+  `BiquadFilterNode` e posicionada por `PannerNode` com modelo HRTF.
+- **Ouvinte sincronizado à câmera** — posição, direção frontal e vetor
+  vertical do `AudioListener` nativo são atualizados a cada frame a partir
+  da câmera Three.js. Assim, girar a cabeça e caminhar altera de verdade a
+  direção e a intensidade percebidas do zumbido.
+- **Origem por sala** — o descritor retornado por `cozinha.js` e
+  `corredor.js` ganhou `fonteSom`. Na Cozinha, o ruído parece vir de dentro
+  da parede leste, próximo ao ponto frio da bancada; no Corredor, migra para
+  trás da parede na quebra do trajeto. A troca de sala reposiciona a mesma
+  fonte, sugerindo continuidade sem revelar a causa.
+- **Inicialização após interação** — o contexto de áudio só começa no clique
+  da tela de entrada, respeitando a política de autoplay dos navegadores.
+- **HUD convertido em notificação temporária** (`index.html` + `main.js`) —
+  a descrição fixa no canto inferior esquerdo foi substituída por um painel
+  discreto inspirado no modelo enviado: rótulo de sistema, título do objeto
+  ou sala e texto descritivo, com fundo escuro translúcido e borda fina.
+- **Mesmo comportamento para objetos e salas** — tanto a fala de um objeto
+  clicado quanto a descrição exibida ao entrar em uma sala aparecem por 5
+  segundos e depois somem. Uma nova mensagem cancela o temporizador anterior,
+  substitui o conteúdo e reinicia os 5 segundos.
+- **Acessibilidade e movimento** — o painel usa `role="status"`,
+  `aria-live="polite"` e `aria-atomic="true"`; a transição respeita
+  `prefers-reduced-motion` e o tamanho se adapta a telas estreitas.
+- **Validação** — `pnpm build` concluído sem erros; Cozinha, carregamento do
+  HUD, desaparecimento após 5 segundos e execução sem erros de console foram
+  verificados no navegador com WebGL habilitado.
+
+**Estado ao fim da sessão:**
+- [x] Som espacial com origem investigável na Cozinha e no Corredor
+- [x] Notificações de objetos com duração de 5 segundos
+- [x] Notificações de entrada em sala com duração de 5 segundos
+- [x] Reinício correto do temporizador ao receber uma nova descrição
+- [ ] As 4 salas finais (salaA-D) e o relatório — ainda só existem no 2D
+
+**Próxima sessão sugerida:** iniciar a geometria das quatro salas de desfecho
+seguindo o contrato atual de descritor de sala (`obstaculos`, `interativos`,
+`spawn`, `fonteSom`) e conectar os destinos que a porta da Cozinha já calcula.

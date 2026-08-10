@@ -235,6 +235,9 @@ export function construirCorredor(scene, ctx = {}) {
     // jogador (0,28m), sobra margem de verdade, não só o suficiente pra
     // não colidir no frame de spawn.
     spawn: { x: P0.x, y: 1.65, z: P0.z + DIR_1.z * 0.8, olharY: ANGULO_1 },
+    // No corredor a mesma frequência migra para trás da parede na quebra,
+    // sugerindo continuidade física sem revelar a origem ao jogador.
+    fonteSom: { x: P1.x - 0.72, y: 1.05, z: P1.z + 0.18 },
     limites: { peDireito: PE_DIREITO },
   }
 }
