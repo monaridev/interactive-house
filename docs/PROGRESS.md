@@ -673,3 +673,57 @@ frio, preservando o conteúdo narrativo já definido em `dados.js`.
 **Próxima sessão sugerida:** construir apenas o Ambiente B, mantendo o mesmo
 processo incremental: geometria isolada, pistas narrativas, colisões, som,
 integração da rota correspondente e validação completa antes do Ambiente C.
+
+### 12/08/2026 — Sessão 19 (relatório/encerramento em 3D)
+
+Até esta sessão, sair pela porta do Ambiente A levava a um beco sem saída:
+como `relatorio` não existia em `SALAS_3D`, o motor só repetia "Está
+entreaberta. Não cede." — nenhuma sessão 3D conseguia, de fato, terminar.
+Isso valia tanto pro final normal (Ambiente A → relatório) quanto pro final
+apressado (loop cozinha↔corredor sem clicar em nada).
+
+- **Reaproveitamento total do conteúdo 2D** — `DATA.relatorios` e
+  `DATA.comportamentos` (`core/dados.js`) já eram dado puro, sem DOM,
+  extraídos assim de propósito na Fase 2. Nenhuma linha desses dados foi
+  alterada; só ganharam um novo consumidor.
+- **Overlay de papel sobre o canvas 3D** (`index.html` + `main.js`) — novo
+  `#relatorio-overlay`, estilizado no mesmo registro visual do terminal 2D
+  (ficha institucional, aba de protocolo, carimbo "encerrado"), mas com
+  variáveis de cor soltas no próprio seletor — não em `:root` — pra nunca
+  vazar pro resto da UI escura do jogo.
+- **Duas telas, mesma sequência do 2D** — `mostrarRelatorio()` (texto do
+  trajeto + botão "Consultar catalogação final") e depois
+  `mostrarCatalogacaoFinal()` (objetos analisados, cluster predominante,
+  texto interpretativo que nunca confirma nem nega). `digitarTexto()` é o
+  mesmo efeito de digitação do 2D, portado sem alteração de lógica.
+- **Gancho no clique da porta** (`main.js`) — o handler agora checa
+  `destino === "relatorio"` e `destino === "relatorioApressado"` ANTES de
+  checar `SALAS_3D[destino]`, na mesma ordem que `app.js` já usava.
+  `"relatorio"` usa `sala.id` (a sala de onde a porta foi clicada) como
+  chave — hoje só `salaA`, mas já pronto pra B/C/D quando existirem.
+- **Encerramento real** — `encerrarExperiencia()` chama `controls.unlock()`
+  (libera o ponteiro), zera o `outlinePass` e esconde o HUD; o overlay cobre
+  a tela inteira, então não há como o clique voltar a alcançar o canvas por
+  baixo. Não existe "voltar pro jogo" — mesmo comportamento terminal do 2D.
+- **Rótulo "UNIDADE 04"** — a versão 2D rotula cada ficha por
+  `TERMINAL A`/`TERMINAL B` (dois notebooks). Como a 3D abandonou esse
+  conceito (só existe uma sessão por vez), troquei o rótulo do protocolo
+  pra "UNIDADE 04", reaproveitando a frase que já existe na tela de
+  entrada ("Levantamento predial — unidade 04"). É só uma constante de
+  texto — fácil de renomear se não fizer sentido.
+
+**Estado ao fim da sessão:**
+- [x] Relatório (Ambiente A) funcional em 3D — loop completo agora existe:
+  Cozinha → Corredor → Ambiente A → Relatório → Catalogação finalizada
+- [x] Final apressado (loop sem clicar em nada) também encerra corretamente
+- [ ] Não testado no navegador ainda (implementado sem servidor local
+  disponível neste ambiente — three.js vem de CDN externo) — pendente de
+  validação por Diogo antes de seguir
+- [ ] Ambiente B em 3D
+- [ ] Ambiente C em 3D
+- [ ] Ambiente D em 3D
+
+**Próxima sessão sugerida:** Diogo testa o relatório no navegador
+(especialmente o `unlock()` do ponteiro e a transição do overlay). Se
+aprovado, seguir para o Ambiente B — com a permissão dele, combinada nesta
+sessão.

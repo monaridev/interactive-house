@@ -25,10 +25,11 @@ import { construirSalaA } from "./sala-a.js"
 import { resolverMovimento, desencaixar } from "./colisao.js"
 
 // ---------- registro de salas 3D ----------
-// Quando a porta calcula um destino que está aqui, a troca é real
-// (nova geometria, câmera reposicionada). Quando não está (salaB-D,
-// relatorio, relatorioApressado — ainda só existem no 2D), a porta só
-// mostra o texto de sempre, sem sala nenhuma pra ir.
+// Quando a porta calcula um destino que está aqui, a troca é real (nova
+// geometria, câmera reposicionada). "relatorio" e "relatorioApressado" são
+// tratados à parte, antes desta checagem (ver encerrarExperiencia) — não
+// são salas, são o fim da experiência. Só salaB-D ainda não existem em
+// 3D: pra elas, a porta mostra o texto de sempre, sem sala nenhuma pra ir.
 const SALAS_3D = {
   cozinha: construirCozinha,
   corredor: construirCorredor,
@@ -272,6 +273,95 @@ function atualizarOuvinte() {
 
 capa.addEventListener("click", iniciarAudio)
 
+// ---------- relatório / encerramento ----------
+// Mesmo conteúdo e mesma regra do 2D (renderRelatorio/renderTerminalFinal em
+// app.js): DATA.relatorios e DATA.comportamentos são dado puro, sem DOM —
+// foram extraídos assim de propósito, então rodam sem alteração aqui. A
+// diferença é só COMO aparece: aqui é um overlay de papel por cima do
+// canvas 3D, em vez de trocar o conteúdo da página inteira.
+const overlayRelatorio = document.getElementById("relatorio-overlay")
+const CLUSTER_LABEL = { corte: "Corte", domestico: "Doméstico", vazio: "Vazio", registro: "Registro" }
+
+function digitarTexto(elemento, texto, velocidade, aoTerminar) {
+  elemento.textContent = ""
+  let i = 0
+  const vel = velocidade || 16
+  ;(function passo() {
+    if (i <= texto.length) {
+      elemento.textContent = texto.slice(0, i)
+      i++
+      setTimeout(passo, vel)
+    } else if (aoTerminar) {
+      aoTerminar()
+    }
+  })()
+}
+
+function montarFicha(html) {
+  overlayRelatorio.innerHTML = `<div class="ficha ficha-entrando">${html}</div>`
+  const ficha = overlayRelatorio.querySelector(".ficha")
+  // dois rAF, não um: força o navegador a pintar o estado "entrando"
+  // antes de tirar a classe, senão a transição às vezes é pulada
+  // (mesmo truque que exibirFicha() usa no 2D)
+  requestAnimationFrame(() => requestAnimationFrame(() => ficha.classList.remove("ficha-entrando")))
+  return ficha
+}
+
+// Segunda tela: olha pra sessão inteira, não só pro trajeto — mesmo texto
+// interpretativo do 2D, que nunca confirma nem nega (WORLD_DESIGN regra 1).
+function mostrarCatalogacaoFinal(salaFinalId) {
+  const objetosAnalisados = Estado.contarCliques("cozinha")
+  const clusterId = salaFinalId !== "apressado" && DATA.salas[salaFinalId] ? DATA.salas[salaFinalId].cluster : null
+  const rotuloCluster = clusterId ? CLUSTER_LABEL[clusterId] : "Nenhum"
+  const comportamento =
+    (DATA.comportamentos && DATA.comportamentos[clusterId || "apressado"]) ||
+    "Nenhuma conclusão definitiva pode ser extraída."
+
+  const ficha = montarFicha(`
+    <div class="protocolo"><span>UNIDADE 04</span><span>${new Date().toLocaleDateString("pt-BR")}</span></div>
+    <h1>Catalogação finalizada</h1>
+    <div class="ficha-dados">
+      <div><span class="rotulo-dado">Objetos analisados</span><span class="valor-dado">${objetosAnalisados}</span></div>
+      <div><span class="rotulo-dado">Cluster predominante</span><span class="valor-dado">${rotuloCluster}</span></div>
+    </div>
+    <p class="digitando"></p>
+    <div class="selo">encerrado</div>
+  `)
+  digitarTexto(ficha.querySelector(".digitando"), comportamento)
+}
+
+function mostrarRelatorio(salaFinalId) {
+  const perfil = (DATA.relatorios && DATA.relatorios[salaFinalId]) || { texto: "O levantamento foi encerrado." }
+  const ficha = montarFicha(`
+    <div class="protocolo"><span>UNIDADE 04</span><span>${new Date().toLocaleDateString("pt-BR")}</span></div>
+    <h1>Registro encerrado</h1>
+    <p class="digitando"></p>
+    <div class="selo">encerrado</div>
+  `)
+  digitarTexto(ficha.querySelector(".digitando"), perfil.texto, undefined, () => {
+    const botao = document.createElement("button")
+    botao.type = "button"
+    botao.className = "continuar-catalogacao"
+    botao.textContent = "Consultar catalogação final"
+    botao.addEventListener("click", () => mostrarCatalogacaoFinal(salaFinalId))
+    ficha.appendChild(botao)
+  })
+}
+
+// Chamada uma única vez, quando a porta calcula "relatorio" ou
+// "relatorioApressado". Libera o ponteiro (PointerLockControls) e some
+// com o HUD e o contorno — a partir daqui não há mais jogo, só a ficha.
+// O overlay cobre a tela inteira, então cliques não voltam a alcançar o
+// canvas por baixo.
+function encerrarExperiencia(salaFinalId) {
+  controls.unlock()
+  outlinePass.selectedObjects = []
+  hud.classList.remove("visivel")
+  overlayRelatorio.setAttribute("aria-hidden", "false")
+  overlayRelatorio.classList.add("visivel")
+  mostrarRelatorio(salaFinalId)
+}
+
 // ---------- troca de sala ----------
 // Descarta tudo que a sala anterior pôs na cena — geometria E material/
 // textura, não só o mesh — antes de construir a próxima. Sem isso, cada
@@ -409,12 +499,18 @@ renderer.domElement.addEventListener("click", () => {
         : sala.porta.proxima
     console.log(`[3d] destino calculado: ${destino}`)
 
-    if (SALAS_3D[destino]) {
+    if (destino === "relatorio") {
+      // "relatorio" é genérico — o relatório de verdade é o da sala em
+      // que a porta foi clicada (mesma leitura que o 2D faz de salaId).
+      encerrarExperiencia(sala.id)
+    } else if (destino === "relatorioApressado") {
+      encerrarExperiencia("apressado")
+    } else if (SALAS_3D[destino]) {
       iniciarTransicao(destino)
     } else {
-      // Ainda não existe em 3D (salaB-D, relatorio, relatorioApressado)
-      // — mesma mensagem de sempre, sem vazar o destino calculado pro
-      // jogador (isso é só pra depuração, no console).
+      // Ainda não existe em 3D (salaB-D) — mesma mensagem de sempre, sem
+      // vazar o destino calculado pro jogador (isso é só pra depuração,
+      // no console).
       escrever("PORTA", "Está entreaberta. Não cede.")
     }
   }

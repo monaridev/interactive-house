@@ -96,6 +96,85 @@
     font: inherit; border: 1px solid #322e28; border-radius: 2px;
     padding: 1px 5px; color: var(--tinta);
   }
+
+  /* Encerramento (relatório): tela cheia por cima do 3D, no mesmo
+     registro visual do terminal 2D (ficha institucional, papel,
+     carimbo). Depois de aparecer não existe "voltar pro jogo" — é o
+     mesmo comportamento terminal que renderRelatorio()/renderTerminalFinal()
+     já têm no 2D. As variáveis de cor ficam soltas aqui (não em :root)
+     de propósito: são só desse cartão de papel, nunca do resto da UI
+     escura do jogo. */
+  #relatorio-overlay {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; box-sizing: border-box;
+    background: #d8d9d3;
+    background-image:
+      repeating-linear-gradient(0deg, transparent 0 2px, #00000004 2px 3px),
+      repeating-linear-gradient(90deg, transparent 0 2px, #00000003 2px 3px);
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .5s ease, visibility 0s linear .5s;
+  }
+  #relatorio-overlay.visivel {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    transition: opacity .5s ease;
+  }
+  #relatorio-overlay .ficha {
+    --ink: #24261f; --ink-muted: #5b5d52; --panel: #c9cac2;
+    --panel-edge: #b7b8ae; --line: #a9aa9f; --stamp-faint: #7a2e2e88;
+    max-width: 520px; width: 100%;
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    position: relative; padding: 46px 34px 30px; margin-top: 18px;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,.5);
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    color: var(--ink);
+    transition: opacity .3s ease, transform .3s ease;
+  }
+  #relatorio-overlay .ficha.ficha-entrando { opacity: 0; transform: translateY(8px); }
+  #relatorio-overlay .protocolo {
+    position: absolute; top: -23px; left: 22px; width: 196px;
+    padding: 6px 12px 5px; box-sizing: border-box;
+    background: var(--panel); border: 1px solid var(--panel-edge); border-bottom: none;
+    clip-path: polygon(6% 0, 94% 0, 100% 100%, 0% 100%);
+    font-family: "Courier New", ui-monospace, monospace; font-size: 9.5px;
+    letter-spacing: .02em; color: var(--ink-muted);
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  }
+  #relatorio-overlay h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 14px;
+  }
+  #relatorio-overlay p.digitando {
+    font-size: 15px; line-height: 1.65; margin: 0 0 8px; white-space: pre-line;
+    min-height: 1.65em;
+  }
+  #relatorio-overlay .ficha-dados {
+    display: flex; flex-direction: column; gap: 10px; margin: 4px 0 20px;
+    padding: 14px 16px; border: 1px solid var(--line); background: #d8d9d3;
+  }
+  #relatorio-overlay .ficha-dados > div { display: flex; justify-content: space-between; gap: 12px; }
+  #relatorio-overlay .rotulo-dado {
+    font-family: "Courier New", ui-monospace, monospace; font-size: 10.5px;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted);
+  }
+  #relatorio-overlay .valor-dado { font-size: 15px; font-weight: 700; }
+  #relatorio-overlay .continuar-catalogacao {
+    all: unset; cursor: pointer; display: inline-block; margin-top: 18px;
+    font-family: "Courier New", ui-monospace, monospace; font-size: 11px;
+    letter-spacing: .06em; color: var(--ink-muted);
+    border: 1px solid var(--line); padding: 8px 14px;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  #relatorio-overlay .continuar-catalogacao:hover { color: var(--ink); border-color: #8a8c81; }
+  #relatorio-overlay .selo {
+    position: absolute; bottom: 20px; right: 26px;
+    border: 1.5px solid var(--stamp-faint); color: var(--stamp-faint);
+    font-family: "Courier New", ui-monospace, monospace; font-size: 10px;
+    letter-spacing: .08em; padding: 5px 9px; transform: rotate(-4deg);
+    text-transform: uppercase; pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #relatorio-overlay, #relatorio-overlay .ficha { transition: none; }
+  }
 </style>
 
 <!--
@@ -130,6 +209,7 @@
     <span id="hud-texto"></span>
   </aside>
   <div id="transicao"></div>
+  <div id="relatorio-overlay" role="region" aria-label="Encerramento do levantamento" aria-hidden="true"></div>
 
   <script src="../../core/dados.js"></script>
   <script src="../../core/estado.js"></script>

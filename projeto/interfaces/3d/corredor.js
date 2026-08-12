@@ -176,15 +176,19 @@ export function construirCorredor(scene, ctx = {}) {
   tampaComVao(P0, ANGULO_1)
   const { perp: perpSaida } = tampaComVao(P2, ANGULO_2)
 
-  // ---------- porta de entrada (decorativa) ----------
+  // ---------- porta de entrada (retorno à Cozinha) ----------
   // A porta da Cozinha, vista de trás — "atrás de você", como diz a
-  // descrição em dados.js. Fechada, não-interativa: não tem
-  // userData.tipo, então o raycast nunca acha ela. É só o que faz P0
-  // parecer uma parede com uma porta, não uma parede lisa.
+  // descrição em dados.js. Ela também é interativa para que o jogador
+  // possa desfazer o trajeto e retornar à Cozinha.
   const portaEntrada = criarPorta(LARGURA_PORTA - 0.06, ALTURA_PORTA - 0.04)
   portaEntrada.position.set(P0.x, 0, P0.z)
   portaEntrada.rotation.y = ANGULO_1 + Math.PI // de costas pro corredor
+  portaEntrada.userData = {
+    tipo: "porta",
+    ref: { id: "porta-retorno-cozinha", nome: "Porta para a Cozinha", proxima: "cozinha" },
+  }
   scene.add(portaEntrada)
+  interativos.push(portaEntrada)
 
   // ---------- porta de saída (interativa, sutilmente diferente a cada volta) ----------
   // "Sutilmente diferente": nada que mude a leitura da cena (não é uma
