@@ -998,3 +998,70 @@ do hover em movimento livre, a calibração final do brilho e da tipografia nas
 resoluções reais, a colisão ao se aproximar da estante e a sequência completa
 de liberar/retomar Pointer Lock. O navegador automatizado não concedeu Pointer
 Lock real; a capa de recuperação foi mantida para esse caso.
+
+### 17/08/2026 — Sessão 27 (reforma geral dos ambientes 3D)
+
+Corredor, Ambientes A–D e Sala Final receberam uma segunda geração de
+arquitetura, iluminação, objetos e narrativa ambiental. A Cozinha permaneceu
+intacta e serviu como referência de acabamento, não como modelo de layout. Os
+contratos das salas, IDs, rotas, clusters, Vestígios, reações e fluxos de
+encerramento foram preservados.
+
+- **Corredor** (`corredor.js`): o traçado baixo, estreito e levemente torto foi
+  mantido. Pórticos técnicos, painéis de manutenção, placas sem legenda útil e
+  um trilho contínuo no teto passaram a medir o percurso e concentrar a imagem
+  memorável na quebra. A iluminação fria ganhou profundidade sem adicionar
+  outra sombra. O spawn agora olha para o trajeto; a parede diagonal foi
+  aproximada por pequenos colisores para não fechar artificialmente a curva.
+- **Ambiente A** (`sala-a.js`): o antigo corredor de metal virou uma baia de
+  processamento interrompido, com painéis removíveis, trilho superior, bancada
+  de calibração, batentes, canal de coleta e iluminação de inspeção. A placa
+  recebeu suporte funcional; a ferramenta ganhou lâmina, guarda e espigão sem
+  cabo; a trilha foi integrada ao canal. Apenas uma luz mantém sombras.
+- **Ambiente B** (`sala-b.js`): a sala de jantar passou a parecer uma memória
+  doméstica reconstruída. Mesa com estrutura completa, tecido levemente
+  deformado, pratos em camadas, talheres reconhecíveis, cadeira com encosto
+  vazado e copo com base substituem os volumes simples. Molduras excessivamente
+  regulares e um aparador com nicho vazio reforçam a dúvida entre casa e
+  montagem. O spawn e a luz pendente enquadram a mesa sem copiar a Cozinha.
+- **Ambiente C** (`sala-c.js`): a composição permaneceu minimalista. Uma
+  silhueta alta removida da parede, quatro fixações, juntas interrompidas, um
+  volume sugerido apenas por poeira, marca de piso e moldura vazia no teto
+  concentram a ausência em poucos elementos. Luz direcional e materiais frios
+  revelam superfícies sem preencher o cômodo com props.
+- **Ambiente D** (`sala-d.js`): as duas estantes genéricas foram diferenciadas
+  em módulos fechados de arquivo e estrutura aberta de consulta. Gavetas,
+  etiquetas, pastas, mesa inclinada de catalogação, ficha presa, gaveteiro,
+  carimbo com empunhadura e câmera de observação criam um arquivo institucional
+  que prepara a Sala Final. A circulação central continua livre.
+- **Sala Final** (`sala-final.js`): recebeu apenas alinhamento visual: rodapés,
+  grelha de teto, estrutura completa da mesa, cadeira vazada, gavetas e
+  puxadores no armário. Dossiê, Diário físico, leitor, posições narrativas e
+  encerramento não foram alterados.
+- **Vestígios Narrativos:** todas as condições existentes e as quatro
+  combinações raras continuam nas mesmas salas. Os efeitos foram mantidos nos
+  grupos interativos remodelados; não houve alteração de taxonomia ou estado.
+- **Colisões e circulação:** o mobiliário novo de A, B e D possui projeções
+  próprias. Uma simulação em grade confirmou spawn livre, região navegável e
+  alcance de todos os interativos nas seis salas. A curva do Corredor recebeu
+  colisores segmentados locais sem mudar `colisao.js`.
+- **Performance:** geometrias continuam procedurais, materiais são
+  compartilhados dentro de cada sala e apenas uma luz por ambiente gera mapa
+  de sombra. Não foram adicionados assets externos nem sistemas persistentes.
+
+**Validação realizada:** `node --check` nos módulos alterados e nos módulos
+centrais relacionados; `git diff --check`; carregamento WebGL individual das
+seis salas com e sem Vestígios; presença e alcance de todos os IDs interativos;
+spawns e regiões navegáveis; combinações raras A–D; URLs normal e
+`?apresentacao=1`; atalhos `2`–`7`; 24 trocas repetidas de ambiente com descarte
+central ativo; console limpo em todos esses fluxos. O harness temporário de
+render, colisão e alcance foi removido ao final. `main.js`, `dados.js`, estado,
+reação, Diário e Cozinha não receberam alterações, preservando rotas, final
+apressado e as integrações existentes.
+
+**Validação manual restante:** percorrer todas as salas com Pointer Lock real,
+confirmar colisão por contato nos cantos e móveis, alcance/hover em movimento,
+volume e direção do som espacial, leitura das luzes nas resoluções da
+apresentação e os fluxos completos de porta, final apressado, dossiê e Diário.
+O navegador automatizado não concedeu Pointer Lock, por isso áudio posicional
+e sensação de circulação ainda dependem dessa passagem manual.

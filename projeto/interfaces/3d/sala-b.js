@@ -31,6 +31,35 @@ function alvo(scene, ref, partes, x = 0, y = 0, z = 0, ry = 0) {
   return grupo
 }
 
+function tecidoMesa(material) {
+  const geometria = new THREE.PlaneGeometry(1.52, 2.08, 8, 12)
+  const pos = geometria.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i)
+    const y = pos.getY(i)
+    const borda = Math.max(Math.abs(x) / 0.76, Math.abs(y) / 1.04)
+    pos.setZ(i, Math.sin(x * 8 + y * 3) * 0.004 - Math.max(0, borda - 0.86) * 0.035)
+  }
+  geometria.computeVertexNormals()
+  const pano = mesh(geometria, material, 0, 0.842, 0, -Math.PI / 2)
+  pano.material.side = THREE.DoubleSide
+  return pano
+}
+
+function pratoPosto(materialLouca, materialMetal, z) {
+  const partes = []
+  partes.push(mesh(new THREE.CylinderGeometry(0.17, 0.15, 0.025, 28), materialLouca, 0, 0.855, z))
+  partes.push(mesh(new THREE.TorusGeometry(0.125, 0.012, 7, 28), materialLouca, 0, 0.873, z, Math.PI / 2))
+  for (const x of [-0.245, 0.245]) {
+    partes.push(mesh(new THREE.BoxGeometry(0.016, 0.012, 0.25), materialMetal, x, 0.874, z))
+  }
+  // Três dentes tornam o talher da esquerda reconhecível sem geometria cara.
+  for (let i = -1; i <= 1; i++) {
+    partes.push(mesh(new THREE.BoxGeometry(0.007, 0.012, 0.06), materialMetal, -0.245 + i * 0.012, 0.876, z - 0.145))
+  }
+  return partes
+}
+
 export function construirSalaB(scene, ctx = {}) {
   const data = DATA.salas.salaB
   const vestigios = ctx.vestigios
@@ -41,11 +70,13 @@ export function construirSalaB(scene, ctx = {}) {
 
   const parede = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 2), color: 0x8b806f, roughness: 0.94 })
   const piso = new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(3, 4), color: 0x665845, roughness: 0.86 })
-  const madeira = new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(1, 2), color: 0x4a3c2d, roughness: 0.82 })
+  const madeira = new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(1, 2), color: 0x574735, roughness: 0.82 })
   const tecido = new THREE.MeshStandardMaterial({ map: TEX.tecido(2, 2), color: 0x8b8373, roughness: 0.98 })
   const metal = new THREE.MeshStandardMaterial({ map: TEX.metal(), color: 0x8a8a84, roughness: 0.42, metalness: 0.78 })
   const louca = new THREE.MeshStandardMaterial({ color: 0xd1cbbc, roughness: 0.25 })
   const vidro = new THREE.MeshStandardMaterial({ color: 0xb8c5c3, roughness: 0.08, transparent: true, opacity: 0.32 })
+  const escuro = new THREE.MeshStandardMaterial({ color: 0x29251f, roughness: 0.85 })
+  const papel = new THREE.MeshStandardMaterial({ map: TEX.papel(), color: 0xb7ad96, roughness: 0.94 })
 
   const mx = LARGURA / 2
   const mz = COMPRIMENTO / 2
@@ -68,19 +99,46 @@ export function construirSalaB(scene, ctx = {}) {
     caixa(0, -mz, LARGURA, ESPESSURA),
   )
 
+  // Molduras e um aparador reconstruído de forma quase simétrica deixam a
+  // sala doméstica demais para ser institucional, e regular demais para ser
+  // uma casa em uso. Um nicho permanece vazio no conjunto.
+  for (const x of [-1.25, 0, 1.25]) {
+    scene.add(mesh(new THREE.BoxGeometry(0.92, 0.045, 0.035), madeira, x, 2.04, mz - 0.09))
+    scene.add(mesh(new THREE.BoxGeometry(0.045, 0.72, 0.035), madeira, x - 0.44, 1.7, mz - 0.09))
+    scene.add(mesh(new THREE.BoxGeometry(0.045, 0.72, 0.035), madeira, x + 0.44, 1.7, mz - 0.09))
+    scene.add(mesh(new THREE.BoxGeometry(0.92, 0.045, 0.035), madeira, x, 1.36, mz - 0.09))
+  }
+  const aparadorX = -mx + 0.34
+  scene.add(mesh(new THREE.BoxGeometry(0.56, 0.82, 2.1), madeira, aparadorX, 0.41, 0.08))
+  for (const z of [-0.62, 0.08, 0.78]) {
+    scene.add(mesh(new THREE.BoxGeometry(0.025, 0.62, 0.58), escuro, aparadorX + 0.293, 0.47, z))
+    scene.add(mesh(new THREE.BoxGeometry(0.018, 0.025, 0.18), metal, aparadorX + 0.31, 0.49, z))
+  }
+  for (const [z, presente] of [[-0.62, true], [0.08, false], [0.78, true]]) {
+    if (!presente) {
+      const marca = new THREE.Mesh(new THREE.PlaneGeometry(0.31, 0.25), new THREE.MeshStandardMaterial({ color: 0x817867, transparent: true, opacity: 0.2, roughness: 1 }))
+      marca.position.set(aparadorX + 0.315, 1.08, z)
+      marca.rotation.y = Math.PI / 2
+      scene.add(marca)
+      continue
+    }
+    scene.add(mesh(new THREE.CylinderGeometry(0.1, 0.075, 0.22, 18), louca, aparadorX + 0.03, 0.97, z))
+  }
+  obstaculos.push(caixa(aparadorX, 0.08, 0.6, 2.16))
+
   // Mesa posta: a toalha é um alvo próprio e cobre só o tampo; a mesa
   // mantém pés e talheres no mesmo grupo para o contorno ler o conjunto.
   const mesaPartes = [mesh(new THREE.BoxGeometry(1.58, 0.09, 2.15), madeira, 0, 0.77, 0)]
+  mesaPartes.push(mesh(new THREE.BoxGeometry(1.43, 0.14, 0.06), madeira, 0, 0.67, -0.97))
+  mesaPartes.push(mesh(new THREE.BoxGeometry(1.43, 0.14, 0.06), madeira, 0, 0.67, 0.97))
+  mesaPartes.push(mesh(new THREE.BoxGeometry(0.06, 0.14, 1.88), madeira, -0.7, 0.67, 0))
+  mesaPartes.push(mesh(new THREE.BoxGeometry(0.06, 0.14, 1.88), madeira, 0.7, 0.67, 0))
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     mesaPartes.push(mesh(new THREE.BoxGeometry(0.075, 0.74, 0.075), madeira, sx * 0.66, 0.37, sz * 0.94))
   }
-  for (const z of [-0.58, 0.58]) {
-    mesaPartes.push(mesh(new THREE.CylinderGeometry(0.13, 0.1, 0.025, 24), louca, 0, 0.835, z))
-    for (const x of [-0.22, 0.22]) mesaPartes.push(mesh(new THREE.BoxGeometry(0.018, 0.012, 0.28), metal, x, 0.85, z))
-  }
+  for (const z of [-0.58, 0.58]) mesaPartes.push(...pratoPosto(louca, metal, z))
   const mesa = alvo(scene, refs.mesa, mesaPartes, -0.18, 0, -0.05)
   if (intensidade(vestigios, "registro") >= 2) {
-    const papel = new THREE.MeshStandardMaterial({ color: 0xb7ad96, roughness: 0.94 })
     const tinta = new THREE.MeshStandardMaterial({ color: 0x3d3932, roughness: 1 })
     mesa.add(mesh(new THREE.BoxGeometry(0.2, 0.008, 0.1), papel, 0.52, 0.837, -0.64, 0, 0.08))
     mesa.add(mesh(new THREE.BoxGeometry(0.11, 0.003, 0.008), tinta, 0.52, 0.844, -0.64, 0, 0.08))
@@ -88,7 +146,7 @@ export function construirSalaB(scene, ctx = {}) {
   interativos.push(mesa)
   obstaculos.push(caixa(-0.18, -0.05, 1.58, 2.15))
 
-  const toalha = alvo(scene, refs.toalha, [mesh(new THREE.BoxGeometry(1.48, 0.018, 2.03), tecido, 0, 0.826, 0)])
+  const toalha = alvo(scene, refs.toalha, [tecidoMesa(tecido)])
   toalha.position.set(-0.18, 0, -0.05)
   if (intensidade(vestigios, "corte") >= 2) {
     const corFibra = combinacoes.fibraMarcada ? 0x713c36 : 0x4b4439
@@ -101,10 +159,11 @@ export function construirSalaB(scene, ctx = {}) {
   interativos.push(toalha)
 
   // Cadeira isolada no lado norte, virada de costas para a entrada.
-  const cadeiraPartes = [
-    mesh(new THREE.BoxGeometry(0.52, 0.08, 0.48), madeira, 0, 0.47, 0),
-    mesh(new THREE.BoxGeometry(0.52, 0.62, 0.065), madeira, 0, 0.79, -0.21),
-  ]
+  const cadeiraPartes = [mesh(new THREE.BoxGeometry(0.52, 0.08, 0.48), madeira, 0, 0.47, 0)]
+  cadeiraPartes.push(mesh(new THREE.BoxGeometry(0.52, 0.075, 0.065), madeira, 0, 1.04, -0.21))
+  for (const x of [-0.2, -0.1, 0, 0.1, 0.2]) {
+    cadeiraPartes.push(mesh(new THREE.BoxGeometry(0.038, 0.52, 0.045), madeira, x, 0.79, -0.21, 0.06))
+  }
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     cadeiraPartes.push(mesh(new THREE.BoxGeometry(0.055, 0.46, 0.055), madeira, sx * 0.21, 0.23, sz * 0.18))
   }
@@ -115,6 +174,7 @@ export function construirSalaB(scene, ctx = {}) {
   const copoPartes = [
     mesh(new THREE.CylinderGeometry(0.052, 0.038, 0.14, 20, 1, true), vidro, 0, 0.9, 0),
     mesh(new THREE.RingGeometry(0.041, 0.052, 20), vidro, 0, 0.973, 0, -Math.PI / 2),
+    mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.008, 20), vidro, 0, 0.828, 0),
   ]
   const copo = alvo(scene, refs.copo, copoPartes, 0.34, 0, 0.62)
   if (intensidade(vestigios, "observacao") >= 2) {
@@ -129,15 +189,21 @@ export function construirSalaB(scene, ctx = {}) {
   scene.add(porta)
   interativos.push(porta)
 
-  scene.add(new THREE.AmbientLight(0x514a40, 0.66))
-  scene.add(new THREE.HemisphereLight(0xa39780, 0x2c231b, 0.54))
-  const pendente = new THREE.PointLight(0xffcf91, 8.1, 6.4, 2)
+  scene.add(new THREE.AmbientLight(0x5b5145, 0.72))
+  scene.add(new THREE.HemisphereLight(0xb0a28a, 0x33281e, 0.68))
+  const pendente = new THREE.PointLight(0xffcf91, 8.4, 6.8, 2)
   pendente.position.set(-0.18, 2.18, -0.05)
   pendente.castShadow = true
   pendente.shadow.mapSize.set(512, 512)
   scene.add(pendente)
   scene.add(mesh(new THREE.ConeGeometry(0.24, 0.18, 20, 1, true), madeira, -0.18, 2.34, -0.05, Math.PI))
-  const luzPorta = new THREE.PointLight(0xaab9c4, 1.65, 3.4, 2)
+  for (const x of [-1.25, 1.25]) {
+    const lavagem = new THREE.SpotLight(0xe3c79c, 1.45, 3.5, Math.PI / 5, 0.92, 2)
+    lavagem.position.set(x, 2.22, mz - 0.5)
+    lavagem.target.position.set(x, 1.45, mz - 0.08)
+    scene.add(lavagem, lavagem.target)
+  }
+  const luzPorta = new THREE.PointLight(0xaab9c4, 3.2, 4.2, 2)
   luzPorta.position.set(0, 1.75, -mz + 0.35)
   scene.add(luzPorta)
   if (intensidade(vestigios, "frio") >= 2) {
@@ -152,7 +218,7 @@ export function construirSalaB(scene, ctx = {}) {
     porta: refs.porta,
     obstaculos,
     interativos,
-    spawn: { x: 1.45, y: 1.65, z: 2.02, olharY: -0.35 },
+    spawn: { x: 1.08, y: 1.65, z: 2.12, olharY: 0.42 },
     fonteSom: { x: -mx - 0.2, y: 0.8, z: -0.9 },
     limites: { peDireito: PE_DIREITO },
   }

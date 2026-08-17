@@ -7,11 +7,11 @@ import { combinacoesRaras, intensidade } from "./vestigios.js"
 // Ambiente D — arquivo/catalogação. A repetição é institucional, não uma
 // pilha de detalhes caros: geometrias e materiais são compartilhados e os
 // quatro alvos narrativos continuam distintos.
-const LARGURA = 3.05
+const LARGURA = 3.5
 const COMPRIMENTO = 7.4
 const PE_DIREITO = 2.55
 const ESPESSURA = 0.14
-const PROF_PRATELEIRA = 0.38
+const PROF_PRATELEIRA = 0.46
 
 function mesh(geometria, material, x, y, z, rx = 0, ry = 0, rz = 0) {
   const objeto = new THREE.Mesh(geometria, material)
@@ -44,12 +44,14 @@ export function construirSalaD(scene, ctx = {}) {
 
   const parede = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 3), color: 0x77776f, roughness: 0.94 })
   const piso = new THREE.MeshStandardMaterial({ map: TEX.piso(2, 5), color: 0x555750, roughness: 0.92 })
-  const metal = new THREE.MeshStandardMaterial({ map: TEX.metal(1, 3), color: 0x535b5c, roughness: 0.62, metalness: 0.68 })
+  const metal = new THREE.MeshStandardMaterial({ map: TEX.metal(1, 3), color: 0x626c6d, roughness: 0.62, metalness: 0.68 })
   const corPapel = intensidade(vestigios, "frio") >= 2 ? 0xb4bab0 : 0xbdb59f
   const papel = new THREE.MeshStandardMaterial({ map: TEX.papel(), color: corPapel, roughness: 0.92 })
   const pasta = new THREE.MeshStandardMaterial({ color: 0x6f6654, roughness: 0.9 })
   const tinta = new THREE.MeshStandardMaterial({ color: 0x2b2925, roughness: 0.9 })
   const carimbo = new THREE.MeshStandardMaterial({ color: 0x713b36, roughness: 0.82 })
+  const metalEscuro = new THREE.MeshStandardMaterial({ color: 0x353d3e, roughness: 0.72, metalness: 0.58 })
+  const vidro = new THREE.MeshStandardMaterial({ color: 0x809397, roughness: 0.2, transparent: true, opacity: 0.32 })
 
   scene.add(mesh(new THREE.PlaneGeometry(LARGURA, COMPRIMENTO), piso, 0, 0, 0, -Math.PI / 2))
   scene.add(mesh(new THREE.PlaneGeometry(LARGURA, COMPRIMENTO), parede, 0, PE_DIREITO, 0, Math.PI / 2))
@@ -70,33 +72,45 @@ export function construirSalaD(scene, ctx = {}) {
     caixa(0, -mz, LARGURA, ESPESSURA),
   )
 
-  // Duas estantes contínuas deixam um corredor central estreito. A da
-  // direita é o alvo "prateleira"; a da esquerda contém o alvo "arquivo".
-  function estruturaEstante(x) {
+  // À esquerda, módulos fechados de arquivo; à direita, uma estrutura de
+  // consulta aberta. A diferença de silhueta impede a leitura de "duas
+  // prateleiras genéricas" e transforma o eixo central em área de triagem.
+  function estruturaBanco(lado, fechado) {
     const partes = []
-    partes.push(mesh(new THREE.BoxGeometry(0.055, 2.2, COMPRIMENTO - 0.8), metal, 0, 1.1, 0))
-    for (const y of [0.18, 0.65, 1.12, 1.59, 2.06]) {
-      partes.push(mesh(new THREE.BoxGeometry(PROF_PRATELEIRA, 0.035, COMPRIMENTO - 0.8), metal, x < 0 ? PROF_PRATELEIRA / 2 : -PROF_PRATELEIRA / 2, y, 0))
+    const frente = -lado * (PROF_PRATELEIRA / 2 + 0.01)
+    partes.push(mesh(new THREE.BoxGeometry(0.045, 2.22, COMPRIMENTO - 0.72), metalEscuro, lado * (PROF_PRATELEIRA / 2 - 0.025), 1.11, 0))
+    for (const z of [-2.88, -1.44, 0, 1.44, 2.88]) {
+      partes.push(mesh(new THREE.BoxGeometry(PROF_PRATELEIRA, 2.22, 0.055), metal, 0, 1.11, z))
+    }
+    for (const y of [0.18, 0.64, 1.1, 1.56, 2.02]) {
+      partes.push(mesh(new THREE.BoxGeometry(PROF_PRATELEIRA, 0.035, COMPRIMENTO - 0.82), metal, 0, y, 0))
+    }
+    if (fechado) {
+      for (let linha = 0; linha < 4; linha++) for (let coluna = 0; coluna < 4; coluna++) {
+        const z = -2.16 + coluna * 1.44
+        const y = 0.4 + linha * 0.46
+        partes.push(mesh(new THREE.BoxGeometry(0.025, 0.36, 1.22), metal, frente, y, z))
+        partes.push(mesh(new THREE.BoxGeometry(0.018, 0.055, 0.22), papel, frente - lado * 0.018, y + 0.05, z))
+        partes.push(mesh(new THREE.BoxGeometry(0.018, 0.025, 0.2), metalEscuro, frente - lado * 0.025, y - 0.08, z))
+      }
     }
     return partes
   }
-  const estanteEsq = alvo(scene, refs.arquivo, estruturaEstante(-mx), -mx + 0.035, 0, 0)
-  const estanteDir = alvo(scene, refs.prateleira, estruturaEstante(mx), mx - 0.035, 0, 0)
+  const bancoX = mx - PROF_PRATELEIRA / 2
+  const estanteEsq = alvo(scene, refs.arquivo, estruturaBanco(-1, true), -bancoX, 0, 0)
+  const estanteDir = alvo(scene, refs.prateleira, estruturaBanco(1, false), bancoX, 0, 0)
 
-  const pastaGeom = new THREE.BoxGeometry(0.25, 0.34, 0.055)
-  const etiquetaGeom = new THREE.BoxGeometry(0.13, 0.055, 0.006)
-  const slotAusente = intensidade(vestigios, "ausencia") >= 3 ? 12 : -1
-  for (let i = 0; i < 26; i++) {
+  const pastaGeom = new THREE.BoxGeometry(0.31, 0.35, 0.065)
+  const etiquetaGeom = new THREE.BoxGeometry(0.15, 0.058, 0.008)
+  const slotAusente = intensidade(vestigios, "ausencia") >= 3 ? 7 : -1
+  for (let i = 0; i < 15; i++) {
     if (i === slotAusente) continue
-    const ladoEsq = i % 2 === 0
-    const grupo = ladoEsq ? estanteEsq : estanteDir
-    const linha = Math.floor(i / 8) % 4
-    const z = -2.75 + (i % 8) * 0.78 + (linha % 2) * 0.06
-    const xLocal = ladoEsq ? PROF_PRATELEIRA * 0.55 : -PROF_PRATELEIRA * 0.55
-    const folha = mesh(pastaGeom, pasta, xLocal, 0.27 + linha * 0.47, z, 0, ladoEsq ? Math.PI / 2 : -Math.PI / 2, (i % 3 - 1) * 0.02)
-    grupo.add(folha)
-    const etiqueta = mesh(etiquetaGeom, papel, xLocal + (ladoEsq ? 0.13 : -0.13), 0.29 + linha * 0.47, z, 0, ladoEsq ? Math.PI / 2 : -Math.PI / 2)
-    grupo.add(etiqueta)
+    const linha = Math.floor(i / 5)
+    const z = -2.45 + (i % 5) * 1.2
+    const xLocal = -PROF_PRATELEIRA * 0.48
+    const folha = mesh(pastaGeom, pasta, xLocal, 0.38 + linha * 0.46, z, 0, -Math.PI / 2, (i % 3 - 1) * 0.025)
+    estanteDir.add(folha)
+    estanteDir.add(mesh(etiquetaGeom, papel, xLocal - 0.17, 0.41 + linha * 0.46, z, 0, -Math.PI / 2))
   }
   if (intensidade(vestigios, "domestico") >= 3) {
     const tecido = new THREE.MeshStandardMaterial({ map: TEX.tecido(), color: 0x746b5b, roughness: 0.98 })
@@ -105,14 +119,18 @@ export function construirSalaD(scene, ctx = {}) {
   }
   interativos.push(estanteEsq, estanteDir)
   obstaculos.push(
-    caixa(-mx + PROF_PRATELEIRA / 2, 0, PROF_PRATELEIRA, COMPRIMENTO - 0.65),
-    caixa(mx - PROF_PRATELEIRA / 2, 0, PROF_PRATELEIRA, COMPRIMENTO - 0.65),
+    caixa(-bancoX, 0, PROF_PRATELEIRA, COMPRIMENTO - 0.65),
+    caixa(bancoX, 0, PROF_PRATELEIRA, COMPRIMENTO - 0.65),
   )
 
-  // Ficha em uma pequena bandeja central, perto o suficiente para leitura.
-  const bandeja = mesh(new THREE.BoxGeometry(0.62, 0.06, 0.42), metal, 0, 0.82, 0)
-  const haste = mesh(new THREE.BoxGeometry(0.07, 0.82, 0.07), metal, 0, 0.41, 0)
-  const ficha = mesh(new THREE.BoxGeometry(0.5, 0.012, 0.31), papel, 0, 0.86, 0, -0.05)
+  // Ficha em uma mesa de catalogação inclinada, com prendedor e bandeja de
+  // devolução. O móvel tem uma função legível e continua pequeno o bastante
+  // para permitir passagem pelos dois lados.
+  const bandeja = mesh(new THREE.BoxGeometry(0.72, 0.055, 0.5), metal, 0, 0.87, 0, -0.12)
+  const haste = mesh(new THREE.BoxGeometry(0.09, 0.82, 0.09), metalEscuro, 0, 0.41, 0)
+  const base = mesh(new THREE.BoxGeometry(0.48, 0.055, 0.36), metalEscuro, 0, 0.04, 0)
+  const ficha = mesh(new THREE.BoxGeometry(0.57, 0.012, 0.36), papel, 0, 0.915, -0.015, -0.12)
+  const presilha = mesh(new THREE.BoxGeometry(0.18, 0.025, 0.035), metalEscuro, 0, 0.945, -0.165, -0.12)
   for (let i = 0; i < 4; i++) ficha.add(mesh(new THREE.BoxGeometry(0.32 - i * 0.04, 0.004, 0.008), tinta, 0, 0.01, -0.1 + i * 0.06))
   if (intensidade(vestigios, "corte") >= 2) {
     const risco = new THREE.MeshStandardMaterial({ color: 0x684640, roughness: 0.94 })
@@ -124,22 +142,41 @@ export function construirSalaD(scene, ctx = {}) {
     marca.scale.x = 1.7
     ficha.add(marca)
   }
-  const fichaAlvo = alvo(scene, refs.ficha, [bandeja, haste, ficha], 0, 0, 0.62)
+  const fichaAlvo = alvo(scene, refs.ficha, [bandeja, haste, base, ficha, presilha], 0, 0, 0.72)
   if (intensidade(vestigios, "frio") >= 2) {
     const gota = new THREE.MeshStandardMaterial({ color: 0xb4ced1, roughness: 0.12, transparent: true, opacity: 0.42 })
     fichaAlvo.add(mesh(new THREE.SphereGeometry(0.022, 8, 6), gota, 0.23, 0.865, -0.12))
   }
   interativos.push(fichaAlvo)
-  obstaculos.push(caixa(0, 0.62, 0.68, 0.48))
+  obstaculos.push(caixa(0, 0.72, 0.74, 0.54))
 
-  // Selo fora da ficha, sobre uma gaveta baixa à esquerda.
+  // Carimbo com empunhadura e almofada, sobre um gaveteiro de três frentes.
   const seloPartes = [
-    mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.12, 16), carimbo, 0, 0.77, 0),
-    mesh(new THREE.SphereGeometry(0.055, 12, 8), tinta, 0, 0.87, 0),
-    mesh(new THREE.BoxGeometry(0.32, 0.6, 0.44), metal, 0, 0.3, 0),
+    mesh(new THREE.CylinderGeometry(0.06, 0.085, 0.11, 16), carimbo, 0, 0.75, 0),
+    mesh(new THREE.CylinderGeometry(0.035, 0.055, 0.11, 14), carimbo, 0, 0.855, 0),
+    mesh(new THREE.SphereGeometry(0.047, 12, 8), tinta, 0, 0.925, 0),
+    mesh(new THREE.BoxGeometry(0.2, 0.025, 0.16), tinta, 0.14, 0.705, 0.04),
+    mesh(new THREE.BoxGeometry(0.42, 0.68, 0.48), metal, 0, 0.34, 0),
   ]
+  for (const y of [0.16, 0.34, 0.52]) {
+    seloPartes.push(mesh(new THREE.BoxGeometry(0.32, 0.135, 0.025), metalEscuro, 0, y, 0.252))
+    seloPartes.push(mesh(new THREE.BoxGeometry(0.1, 0.02, 0.018), papel, 0, y, 0.27))
+  }
   interativos.push(alvo(scene, refs.selo, seloPartes, -0.77, 0, -1.28))
-  obstaculos.push(caixa(-0.77, -1.28, 0.36, 0.48))
+  obstaculos.push(caixa(-0.77, -1.28, 0.46, 0.52))
+
+  // Um único instrumento de observação amarra a Sala D à Sala Final. Não é
+  // interativo: sua função é fazer o visitante perguntar quem ocupa o outro
+  // lado do registro.
+  const camera = new THREE.Group()
+  camera.add(mesh(new THREE.BoxGeometry(0.28, 0.16, 0.18), metalEscuro, 0, 0, 0))
+  camera.add(mesh(new THREE.CylinderGeometry(0.065, 0.075, 0.12, 16), vidro, 0, -0.015, 0.14, Math.PI / 2))
+  camera.add(mesh(new THREE.BoxGeometry(0.05, 0.28, 0.05), metal, 0, 0.2, -0.03, 0, 0, -0.3))
+  camera.position.set(0.82, 2.18, 2.38)
+  camera.rotation.y = -0.28
+  camera.rotation.x = -0.22
+  scene.add(camera)
+  scene.add(mesh(new THREE.BoxGeometry(0.045, 0.035, 3.6), metalEscuro, mx - 0.14, 2.3, 1.15))
 
   const porta = criarPorta(portaL - 0.06, portaA - 0.04)
   porta.position.set(0, 0, -mz + 0.08)
@@ -147,15 +184,22 @@ export function construirSalaD(scene, ctx = {}) {
   scene.add(porta)
   interativos.push(porta)
 
-  scene.add(new THREE.AmbientLight(0x303334, 0.42))
-  scene.add(new THREE.HemisphereLight(0x879092, 0x181a19, 0.34))
+  scene.add(new THREE.AmbientLight(0x424747, 0.65))
+  scene.add(new THREE.HemisphereLight(0xa0aaa7, 0x232724, 0.7))
   const emissivo = new THREE.MeshStandardMaterial({ color: 0xb7bdb8, emissive: 0x929b98, emissiveIntensity: 1.8, roughness: 0.28 })
-  for (const z of [2.35, 0.05, -2.25]) {
-    scene.add(mesh(new THREE.BoxGeometry(0.78, 0.035, 0.1), emissivo, 0, 2.43, z))
-    const luz = new THREE.PointLight(0xcbd2ce, 3.6, 3.8, 1.8)
+  for (const [i, z] of [2.35, 0.05, -2.55].entries()) {
+    scene.add(mesh(new THREE.BoxGeometry(0.9, 0.035, 0.1), emissivo, 0, 2.43, z))
+    const potencia = i === 1 ? 5.2 : i === 2 ? 5.8 : 3.8
+    const luz = new THREE.PointLight(i === 1 ? 0xd4d9d2 : 0xc2cbc8, potencia, 4.8, 1.8)
     luz.position.set(0, 2.31, z)
+    luz.castShadow = i === 1
+    if (luz.castShadow) luz.shadow.mapSize.set(512, 512)
     scene.add(luz)
   }
+  const luzFicha = new THREE.SpotLight(0xe0d4b8, 2.35, 2.9, Math.PI / 5, 0.8, 2)
+  luzFicha.position.set(-0.45, 1.8, 1.15)
+  luzFicha.target.position.set(0, 0.88, 0.72)
+  scene.add(luzFicha, luzFicha.target)
 
   return {
     id: "salaD",

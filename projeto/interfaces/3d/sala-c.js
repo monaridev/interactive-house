@@ -37,12 +37,14 @@ export function construirSalaC(scene, ctx = {}) {
   const mx = LARGURA / 2
   const mz = COMPRIMENTO / 2
 
-  const concreto = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 3), color: 0x78868a, roughness: 0.94 })
-  const concretoEscuro = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 2), color: 0x4b565a, roughness: 1 })
-  const piso = new THREE.MeshStandardMaterial({ map: TEX.piso(3, 4), color: 0x687579, roughness: 0.96 })
+  const concreto = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 3), color: 0xa0adb0, roughness: 0.94 })
+  const concretoEscuro = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 2), color: 0x667276, roughness: 1 })
+  const piso = new THREE.MeshStandardMaterial({ map: TEX.piso(3, 4), color: 0x849194, roughness: 0.96 })
   const mancha = new THREE.MeshStandardMaterial({ color: 0x101516, roughness: 1, transparent: true, opacity: 0.82 })
   const umidade = new THREE.MeshStandardMaterial({ color: 0xaebfc2, roughness: 0.18, transparent: true, opacity: 0.38 })
   const poeira = new THREE.MeshStandardMaterial({ color: 0xc1cccd, emissive: 0x566366, emissiveIntensity: 0.35, transparent: true, opacity: 0.46 })
+  const junta = new THREE.MeshStandardMaterial({ color: 0x394448, roughness: 0.96 })
+  const marcaRemovida = new THREE.MeshStandardMaterial({ color: 0x9aa5a5, roughness: 1, transparent: true, opacity: 0.16 })
 
   // Chão em quatro placas com inclinações mínimas. A colisão permanece 2D,
   // então o desnível é visual e não interfere no movimento FPS.
@@ -51,6 +53,10 @@ export function construirSalaC(scene, ctx = {}) {
     [-1.12, -1.55, -0.01, -0.012], [1.12, -1.55, 0.015, 0.016],
   ]
   for (const [x, z, rx, rz] of placas) scene.add(mesh(new THREE.PlaneGeometry(LARGURA / 2 + 0.04, COMPRIMENTO / 2 + 0.04), piso, x, 0, z, -Math.PI / 2 + rx, 0, rz))
+
+  // O teto existe quase inteiro; a única interrupção é o módulo retirado
+  // que forma o alvo de condensação mais abaixo.
+  scene.add(mesh(new THREE.PlaneGeometry(LARGURA, COMPRIMENTO), concretoEscuro, 0, PE_DIREITO, 0, Math.PI / 2))
 
   scene.add(mesh(new THREE.BoxGeometry(ESPESSURA, PE_DIREITO, COMPRIMENTO), concreto, -mx, PE_DIREITO / 2, 0, 0, 0, -0.025))
   scene.add(mesh(new THREE.BoxGeometry(ESPESSURA, PE_DIREITO, COMPRIMENTO), concreto, mx, PE_DIREITO / 2, 0, 0, 0, 0.018))
@@ -69,12 +75,25 @@ export function construirSalaC(scene, ctx = {}) {
     caixa(0, -mz, LARGURA, ESPESSURA),
   )
 
-  // Mancha da parede, mais larga na base, construída por discos que se
-  // sobrepõem. O grupo inteiro é um único alvo de interação/OutlinePass.
+  // Rodapé interrompido e juntas largas tornam as superfícies intencionais
+  // sem ocupar o vazio com novos móveis.
+  for (const x of [-mx + 0.09, mx - 0.09]) {
+    scene.add(mesh(new THREE.BoxGeometry(0.035, 0.12, COMPRIMENTO - 0.34), junta, x, 0.06, 0))
+  }
+  for (const z of [-1.55, 0, 1.55]) {
+    scene.add(mesh(new THREE.BoxGeometry(LARGURA - 0.24, 0.012, 0.025), junta, 0, 0.015, z))
+  }
+
+  // Mancha e silhueta de algo alto removido. O contorno limpo e os pontos de
+  // fixação têm tanto peso quanto a área escura: havia função antes do vazio.
   const paredeAlvo = new THREE.Group()
-  for (let i = 0; i < 7; i++) {
-    const raio = 0.42 - i * 0.045
-    paredeAlvo.add(mesh(new THREE.CircleGeometry(raio, 24), mancha, 0.001, 0.3 + i * 0.31, (i % 2 ? 0.06 : -0.04), 0, Math.PI / 2))
+  paredeAlvo.add(mesh(new THREE.PlaneGeometry(0.82, 1.92), mancha, 0.002, 1.02, 0, 0, Math.PI / 2))
+  paredeAlvo.add(mesh(new THREE.PlaneGeometry(0.58, 1.58), marcaRemovida, 0.006, 1.08, -0.02, 0, Math.PI / 2))
+  for (const [y, z] of [[0.35, -0.27], [0.35, 0.27], [1.79, -0.27], [1.79, 0.27]]) {
+    paredeAlvo.add(mesh(new THREE.CircleGeometry(0.027, 12), junta, 0.012, y, z, 0, Math.PI / 2))
+  }
+  for (let i = 0; i < 4; i++) {
+    paredeAlvo.add(mesh(new THREE.BoxGeometry(0.012, 0.018, 0.68 - i * 0.07), mancha, 0.01, 0.14 + i * 0.08, 0.04, 0, 0.02))
   }
   paredeAlvo.position.set(-mx + 0.087, 0, -0.72)
   if (intensidade(vestigios, "corte") >= 2) {
@@ -88,21 +107,26 @@ export function construirSalaC(scene, ctx = {}) {
   tornarAlvo(scene, refs.parede, paredeAlvo)
   interativos.push(paredeAlvo)
 
-  // "Ar" vira partículas suspensas numa faixa densa. São poucas e usam a
-  // mesma geometria/material para manter o custo baixo.
+  // As partículas ocupam apenas as arestas de um volume que não existe.
+  // No centro não há nada para contornar; a ausência é a própria silhueta.
   const arAlvo = new THREE.Group()
   const particulaGeom = new THREE.SphereGeometry(0.018, 6, 5)
-  for (let i = 0; i < 18; i++) {
-    const p = mesh(particulaGeom, poeira, Math.sin(i * 2.1) * 0.62, 0.72 + (i % 6) * 0.17, -0.08 + Math.cos(i * 1.7) * 0.42)
+  for (let i = 0; i < 14; i++) {
+    const lado = i % 2 === 0 ? -1 : 1
+    const p = mesh(particulaGeom, poeira, 0.86 + lado * 0.32, 0.48 + (i % 7) * 0.2, 0.32 + ((i * 3) % 5 - 2) * 0.13)
     p.castShadow = false
     arAlvo.add(p)
   }
   tornarAlvo(scene, refs.ar, arAlvo)
   interativos.push(arAlvo)
 
-  // Condensação: gotas sob uma placa de teto levemente inclinada.
+  // Condensação sob a moldura vazia de uma luminária retirada.
   const tetoAlvo = new THREE.Group()
-  tetoAlvo.add(mesh(new THREE.PlaneGeometry(1.55, 1.3), concretoEscuro, 0, PE_DIREITO - 0.02, -1.3, Math.PI / 2 + 0.03))
+  tetoAlvo.add(mesh(new THREE.BoxGeometry(1.62, 0.07, 1.34), junta, 0, PE_DIREITO - 0.045, -1.3, 0, 0, 0.015))
+  tetoAlvo.add(mesh(new THREE.PlaneGeometry(1.38, 1.08), marcaRemovida, 0, PE_DIREITO - 0.087, -1.3, Math.PI / 2 + 0.02))
+  for (const x of [-0.63, 0.63]) for (const z of [-1.72, -0.88]) {
+    tetoAlvo.add(mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.055, 8), junta, x, PE_DIREITO - 0.13, z))
+  }
   for (let i = 0; i < 12; i++) {
     const gota = mesh(new THREE.SphereGeometry(0.022 + (i % 3) * 0.006, 7, 6), umidade, -0.62 + (i % 4) * 0.4, PE_DIREITO - 0.08 - (i % 2) * 0.025, -1.65 + Math.floor(i / 4) * 0.36)
     gota.scale.y = 1.65
@@ -114,9 +138,11 @@ export function construirSalaC(scene, ctx = {}) {
   // O chão interativo é uma área esbranquiçada próxima ao centro, não um
   // objeto acrescentado ao vazio.
   const chaoAlvo = new THREE.Group()
-  const frio = mesh(new THREE.CircleGeometry(0.72, 32), umidade, 0, 0.012, 0.72, -Math.PI / 2)
-  frio.scale.set(1.4, 0.72, 1)
+  const frio = mesh(new THREE.PlaneGeometry(1.35, 0.82), umidade, 0.78, 0.012, 0.62, -Math.PI / 2, 0, -0.025)
   chaoAlvo.add(frio)
+  for (const x of [0.22, 1.34]) for (const z of [0.31, 0.93]) {
+    chaoAlvo.add(mesh(new THREE.RingGeometry(0.025, 0.04, 12), junta, x, 0.016, z, -Math.PI / 2))
+  }
   tornarAlvo(scene, refs.chao, chaoAlvo)
   interativos.push(chaoAlvo)
 
@@ -148,19 +174,27 @@ export function construirSalaC(scene, ctx = {}) {
   scene.add(porta)
   interativos.push(porta)
 
-  scene.add(new THREE.HemisphereLight(0xb8cdd2, 0x303b3f, 1.04))
-  scene.add(new THREE.AmbientLight(0x46565b, 0.72))
-  const luzFria = new THREE.PointLight(0xc4dce0, 5.9, 6.2, 2)
-  luzFria.position.set(-0.65, 2.32, -1.22)
+  scene.add(new THREE.HemisphereLight(0xb8cdd2, 0x303b3f, 0.88))
+  scene.add(new THREE.AmbientLight(0x46565b, 0.62))
+  const luzFria = new THREE.SpotLight(0xc4dce0, 6.2, 6.5, Math.PI / 4.2, 0.68, 1.8)
+  luzFria.position.set(-1.35, 2.35, -0.95)
+  luzFria.target.position.set(0.78, 0, 0.62)
   luzFria.castShadow = true
   luzFria.shadow.mapSize.set(512, 512)
-  scene.add(luzFria)
-  const luzEntrada = new THREE.PointLight(0x93aeb5, 2.75, 4.6, 2)
+  scene.add(luzFria, luzFria.target)
+  const luzEntrada = new THREE.PointLight(0x93aeb5, 3.6, 4.8, 2)
   luzEntrada.position.set(0.7, 1.45, 2.45)
   scene.add(luzEntrada)
-  const preenchimento = new THREE.PointLight(0x78959d, 3, 5.2, 2)
+  const preenchimento = new THREE.PointLight(0x78959d, 2.7, 5.2, 2)
   preenchimento.position.set(1.2, 0.85, 0.1)
   scene.add(preenchimento)
+  const leitura = new THREE.PointLight(0x9fb9bf, 3.6, 5.6, 2)
+  leitura.position.set(-0.25, 1.9, 1.55)
+  scene.add(leitura)
+  const recorte = new THREE.DirectionalLight(0xa9c1c6, 2.05)
+  recorte.position.set(1.45, 2.35, 2.4)
+  recorte.target.position.set(-0.25, 0.8, -0.45)
+  scene.add(recorte, recorte.target)
 
   return {
     id: "salaC",
@@ -168,7 +202,7 @@ export function construirSalaC(scene, ctx = {}) {
     porta: refs.porta,
     obstaculos,
     interativos,
-    spawn: { x: 0.9, y: 1.65, z: 2.35, olharY: -0.25 },
+    spawn: { x: 0.9, y: 1.65, z: 2.35, olharY: 0.34 },
     fonteSom: { x: -mx - 0.28, y: 1.15, z: -0.72 },
     limites: { peDireito: PE_DIREITO },
   }

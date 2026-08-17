@@ -75,10 +75,14 @@ export function construirCorredor(scene, ctx = {}) {
   // ---------- materiais ----------
   // Metal, não madeira/pedra da Cozinha — o Corredor não pertence ao
   // mesmo léxico construtivo dela. É passagem institucional, não cômodo.
-  const matParede = new THREE.MeshStandardMaterial({ map: TEX.metal(1, 1.6), roughness: 0.55, metalness: 0.55 })
+  const matParede = new THREE.MeshStandardMaterial({ map: TEX.metal(1, 1.6), color: 0x77858b, roughness: 0.55, metalness: 0.55 })
   const matPiso = new THREE.MeshStandardMaterial({ map: TEX.piso(1, 3), roughness: 0.8, metalness: 0.05 })
   const matTeto = new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 1 })
   const matMarco = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.7, metalness: 0.4 })
+  const matEstrutura = new THREE.MeshStandardMaterial({ color: 0x333b3e, roughness: 0.64, metalness: 0.62 })
+  const matPainel = new THREE.MeshStandardMaterial({ color: 0x555b5b, roughness: 0.82, metalness: 0.3 })
+  const matSinal = new THREE.MeshStandardMaterial({ color: 0xb7ae8f, roughness: 0.92 })
+  const matCabo = new THREE.MeshStandardMaterial({ color: 0x171b1c, roughness: 0.72, metalness: 0.42 })
 
   // ---------- um trecho reto (chão, teto, duas paredes) ----------
   function trecho(a, b) {
@@ -114,12 +118,130 @@ export function construirCorredor(scene, ctx = {}) {
       scene.add(parede)
       const wa = { x: a.x + normal.x * sinal * (LARGURA / 2), z: a.z + normal.z * sinal * (LARGURA / 2) }
       const wb = { x: b.x + normal.x * sinal * (LARGURA / 2), z: b.z + normal.z * sinal * (LARGURA / 2) }
-      obstaculos.push(segmento(wa, wb, ESPESSURA_PAREDE))
+      if (Math.abs(wa.x - wb.x) < 0.001 || Math.abs(wa.z - wb.z) < 0.001) {
+        obstaculos.push(segmento(wa, wb, ESPESSURA_PAREDE))
+      } else {
+        // Uma única AABB em torno da parede diagonal ocupava também o lado
+        // interno da curva e podia fechar a passagem para o raio do jogador.
+        // Pequenos retângulos mantêm o mesmo solver 2D e aproximam a parede
+        // real sem introduzir física ou colisores girados no motor inteiro.
+        const partes = Math.ceil(comprimento / 0.22)
+        for (let i = 0; i < partes; i++) {
+          const t0 = i / partes
+          const t1 = (i + 1) / partes
+          const inicio = { x: wa.x + (wb.x - wa.x) * t0, z: wa.z + (wb.z - wa.z) * t0 }
+          const fim = { x: wa.x + (wb.x - wa.x) * t1, z: wa.z + (wb.z - wa.z) * t1 }
+          obstaculos.push(caixa(
+            (inicio.x + fim.x) / 2,
+            (inicio.z + fim.z) / 2,
+            Math.abs(fim.x - inicio.x) + ESPESSURA_PAREDE,
+            Math.abs(fim.z - inicio.z) + ESPESSURA_PAREDE,
+          ))
+        }
+      }
     }
   }
 
   trecho(P0, P1)
   trecho(P1, P2)
+
+  // Uma infraestrutura repetida dá escala ao percurso. Os pórticos não
+  // estreitam a circulação: ficam embutidos nas faces das paredes e no teto.
+  // Na quebra, o trilho troca de direção sem uma junta perfeitamente alinhada,
+  // deixando a dúvida se ele indica um destino ou apenas contorna um defeito.
+  function pontoNoTrecho(a, angulo, distancia) {
+    return { x: a.x + Math.sin(angulo) * distancia, z: a.z + Math.cos(angulo) * distancia }
+  }
+
+  function pórtico(ponto, angulo, indice) {
+    const perp = { x: Math.cos(angulo), z: -Math.sin(angulo) }
+    for (const lado of [-1, 1]) {
+      const montante = new THREE.Mesh(new THREE.BoxGeometry(0.045, PE_DIREITO, 0.075), matEstrutura)
+      montante.position.set(
+        ponto.x + perp.x * lado * (LARGURA / 2 - 0.026),
+        PE_DIREITO / 2,
+        ponto.z + perp.z * lado * (LARGURA / 2 - 0.026),
+      )
+      montante.rotation.y = angulo
+      scene.add(montante)
+
+      const painel = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.62, 0.48), matPainel)
+      painel.position.set(
+        ponto.x + perp.x * lado * (LARGURA / 2 - 0.069),
+        0.42,
+        ponto.z + perp.z * lado * (LARGURA / 2 - 0.069),
+      )
+      painel.rotation.y = angulo
+      scene.add(painel)
+      for (let i = 0; i < 3; i++) {
+        const rasgo = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.025, 0.31 - i * 0.025), matCabo)
+        rasgo.position.set(
+          painel.position.x - perp.x * lado * 0.014,
+          0.29 + i * 0.13,
+          painel.position.z - perp.z * lado * 0.014,
+        )
+        rasgo.rotation.y = angulo
+        scene.add(rasgo)
+      }
+    }
+    const travessa = new THREE.Mesh(new THREE.BoxGeometry(LARGURA - 0.08, 0.055, 0.075), matEstrutura)
+    travessa.position.set(ponto.x, PE_DIREITO - 0.055, ponto.z)
+    travessa.rotation.y = angulo
+    scene.add(travessa)
+
+    // Placas sem legenda legível: a ordem existe, mas não ajuda a localizar.
+    const sinal = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.075, 0.012), matSinal)
+    sinal.position.set(
+      ponto.x + perp.x * (LARGURA / 2 - 0.095),
+      1.67,
+      ponto.z + perp.z * (LARGURA / 2 - 0.095),
+    )
+    sinal.rotation.y = angulo
+    scene.add(sinal)
+    for (let i = 0; i < 2; i++) {
+      const marca = new THREE.Mesh(new THREE.BoxGeometry(0.025 + ((indice + i) % 2) * 0.035, 0.009, 0.006), matCabo)
+      marca.position.set(-0.045 + i * 0.07, 0, 0.01)
+      sinal.add(marca)
+    }
+  }
+
+  const estruturas = [
+    { p: pontoNoTrecho(P0, ANGULO_1, 1.03), a: ANGULO_1 },
+    { p: pontoNoTrecho(P0, ANGULO_1, 2.02), a: ANGULO_1 },
+    { p: pontoNoTrecho(P1, ANGULO_2, 0.75), a: ANGULO_2 },
+    { p: pontoNoTrecho(P1, ANGULO_2, 1.58), a: ANGULO_2 },
+  ]
+  estruturas.forEach(({ p, a }, i) => pórtico(p, a, i + ordem))
+
+  function trilho(a, b, angulo) {
+    const comprimento = Math.hypot(b.x - a.x, b.z - a.z)
+    const trilhoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.06, comprimento), matEstrutura)
+    trilhoMesh.position.set((a.x + b.x) / 2, PE_DIREITO - 0.12, (a.z + b.z) / 2)
+    trilhoMesh.rotation.y = angulo
+    scene.add(trilhoMesh)
+    const cabo = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, comprimento - 0.08), matCabo)
+    cabo.position.set(trilhoMesh.position.x, PE_DIREITO - 0.165, trilhoMesh.position.z)
+    cabo.rotation.y = angulo
+    scene.add(cabo)
+  }
+  trilho(P0, P1, ANGULO_1)
+  trilho(P1, P2, ANGULO_2)
+  const junta = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.105, 0.07, 12), matEstrutura)
+  junta.position.set(P1.x, PE_DIREITO - 0.12, P1.z)
+  scene.add(junta)
+
+  // O frio reforça uma única seção do trilho; a ausência apaga outra. São
+  // variações ambientais, não indicadores de progresso.
+  const sinalFrio = new THREE.MeshStandardMaterial({
+    color: 0xaec6ca,
+    emissive: 0x789498,
+    emissiveIntensity: frio >= 2 ? 0.85 : 0.18,
+    roughness: 0.38,
+  })
+  const faixa = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.018, ausencia >= 3 ? 0.34 : 0.62), sinalFrio)
+  faixa.position.set(P1.x, PE_DIREITO - 0.185, P1.z + 0.08)
+  faixa.rotation.y = ANGULO_2
+  scene.add(faixa)
 
   // AABB do vão da porta, mesmo com o trecho torto. `caixa`/`segmento`
   // em colisao.js só sabem desenhar retângulo alinhado aos eixos — pra
@@ -228,13 +350,13 @@ export function construirCorredor(scene, ctx = {}) {
   interativos.push(portaSaida)
 
   // ---------- luz ----------
-  // Uma lâmpada nua na quebra, mais nada — o resto do trecho fica na
-  // penumbra de propósito. Não tem fonte perto de nenhuma das duas
-  // pontas: as portas (entrada e saída) ficam sempre um pouco mal
-  // iluminadas, o oposto da Cozinha, onde a luz busca os objetos.
-  scene.add(new THREE.AmbientLight(0x2a2c30, 0.35))
+  // A quebra continua sendo a única fonte com sombra. Duas calhas fracas
+  // desenham profundidade suficiente para apresentação sem transformar o
+  // corredor numa sucessão homogênea de lâmpadas.
+  scene.add(new THREE.AmbientLight(0x3d4248, 0.52))
+  scene.add(new THREE.HemisphereLight(0x77858e, 0x171a1b, 0.48))
   const corLampada = frio >= 2 ? 0xc8e0e7 : 0xdfe6ec
-  const lampada = new THREE.PointLight(corLampada, 3.4 + frio * 0.12, 4.6, 2)
+  const lampada = new THREE.PointLight(corLampada, 6.2 + frio * 0.12, 5.2, 2)
   lampada.position.set(P1.x, PE_DIREITO - 0.15, P1.z)
   lampada.castShadow = true
   lampada.shadow.mapSize.set(512, 512)
@@ -245,6 +367,15 @@ export function construirCorredor(scene, ctx = {}) {
   )
   bulbo.position.copy(lampada.position)
   scene.add(bulbo)
+  for (const { p, a } of [estruturas[0], estruturas[3]]) {
+    const calha = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.025, 0.055), sinalFrio)
+    calha.position.set(p.x, PE_DIREITO - 0.09, p.z)
+    calha.rotation.y = a
+    scene.add(calha)
+    const apoio = new THREE.PointLight(0xaebfc6, 1.65, 2.6, 2)
+    apoio.position.set(p.x, PE_DIREITO - 0.2, p.z)
+    scene.add(apoio)
+  }
 
   return {
     id: "corredor",
@@ -256,7 +387,7 @@ export function construirCorredor(scene, ctx = {}) {
     // 0,8m de P0 — com o bloqueio do vão indo até 0,28m + raio do
     // jogador (0,28m), sobra margem de verdade, não só o suficiente pra
     // não colidir no frame de spawn.
-    spawn: { x: P0.x, y: 1.65, z: P0.z + DIR_1.z * 0.8, olharY: ANGULO_1 },
+    spawn: { x: P0.x, y: 1.65, z: P0.z + DIR_1.z * 0.8, olharY: ANGULO_1 + Math.PI },
     // No corredor a mesma frequência migra para trás da parede na quebra,
     // sugerindo continuidade física sem revelar a origem ao jogador.
     fonteSom: {
