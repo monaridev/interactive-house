@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { caixa } from "./colisao.js"
 import { TEX } from "./texturas.js"
 import { criarPorta } from "./modelos.js"
+import { combinacoesRaras, intensidade } from "./vestigios.js"
 
 // Ambiente D — arquivo/catalogação. A repetição é institucional, não uma
 // pilha de detalhes caros: geometrias e materiais são compartilhados e os
@@ -31,8 +32,10 @@ function alvo(scene, ref, partes, x = 0, y = 0, z = 0, ry = 0) {
   return grupo
 }
 
-export function construirSalaD(scene) {
+export function construirSalaD(scene, ctx = {}) {
   const data = DATA.salas.salaD
+  const vestigios = ctx.vestigios
+  const combinacoes = combinacoesRaras(vestigios, "salaD")
   const refs = Object.fromEntries(data.objetos.map((objeto) => [objeto.id, objeto]))
   const obstaculos = []
   const interativos = []
@@ -42,7 +45,8 @@ export function construirSalaD(scene) {
   const parede = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 3), color: 0x77776f, roughness: 0.94 })
   const piso = new THREE.MeshStandardMaterial({ map: TEX.piso(2, 5), color: 0x555750, roughness: 0.92 })
   const metal = new THREE.MeshStandardMaterial({ map: TEX.metal(1, 3), color: 0x535b5c, roughness: 0.62, metalness: 0.68 })
-  const papel = new THREE.MeshStandardMaterial({ map: TEX.papel(), color: 0xbdb59f, roughness: 0.92 })
+  const corPapel = intensidade(vestigios, "frio") >= 2 ? 0xb4bab0 : 0xbdb59f
+  const papel = new THREE.MeshStandardMaterial({ map: TEX.papel(), color: corPapel, roughness: 0.92 })
   const pasta = new THREE.MeshStandardMaterial({ color: 0x6f6654, roughness: 0.9 })
   const tinta = new THREE.MeshStandardMaterial({ color: 0x2b2925, roughness: 0.9 })
   const carimbo = new THREE.MeshStandardMaterial({ color: 0x713b36, roughness: 0.82 })
@@ -81,7 +85,9 @@ export function construirSalaD(scene) {
 
   const pastaGeom = new THREE.BoxGeometry(0.25, 0.34, 0.055)
   const etiquetaGeom = new THREE.BoxGeometry(0.13, 0.055, 0.006)
+  const slotAusente = intensidade(vestigios, "ausencia") >= 3 ? 12 : -1
   for (let i = 0; i < 26; i++) {
+    if (i === slotAusente) continue
     const ladoEsq = i % 2 === 0
     const grupo = ladoEsq ? estanteEsq : estanteDir
     const linha = Math.floor(i / 8) % 4
@@ -91,6 +97,11 @@ export function construirSalaD(scene) {
     grupo.add(folha)
     const etiqueta = mesh(etiquetaGeom, papel, xLocal + (ladoEsq ? 0.13 : -0.13), 0.29 + linha * 0.47, z, 0, ladoEsq ? Math.PI / 2 : -Math.PI / 2)
     grupo.add(etiqueta)
+  }
+  if (intensidade(vestigios, "domestico") >= 3) {
+    const tecido = new THREE.MeshStandardMaterial({ map: TEX.tecido(), color: 0x746b5b, roughness: 0.98 })
+    const dobra = mesh(new THREE.BoxGeometry(0.2, 0.018, 0.16), tecido, PROF_PRATELEIRA * 0.55, 1.15, 1.34, 0.08, Math.PI / 2, 0.12)
+    estanteEsq.add(dobra)
   }
   interativos.push(estanteEsq, estanteDir)
   obstaculos.push(
@@ -103,7 +114,22 @@ export function construirSalaD(scene) {
   const haste = mesh(new THREE.BoxGeometry(0.07, 0.82, 0.07), metal, 0, 0.41, 0)
   const ficha = mesh(new THREE.BoxGeometry(0.5, 0.012, 0.31), papel, 0, 0.86, 0, -0.05)
   for (let i = 0; i < 4; i++) ficha.add(mesh(new THREE.BoxGeometry(0.32 - i * 0.04, 0.004, 0.008), tinta, 0, 0.01, -0.1 + i * 0.06))
-  interativos.push(alvo(scene, refs.ficha, [bandeja, haste, ficha], 0, 0, 0.62))
+  if (intensidade(vestigios, "corte") >= 2) {
+    const risco = new THREE.MeshStandardMaterial({ color: 0x684640, roughness: 0.94 })
+    ficha.add(mesh(new THREE.BoxGeometry(0.38, 0.004, 0.009), risco, 0.01, 0.013, 0.065, 0, 0.04, -0.035))
+  }
+  if (combinacoes.fichaApagada) {
+    const apagado = new THREE.MeshStandardMaterial({ color: 0x756f62, roughness: 1, transparent: true, opacity: 0.34 })
+    const marca = mesh(new THREE.RingGeometry(0.055, 0.079, 24), apagado, -0.11, 0.015, -0.045, -Math.PI / 2)
+    marca.scale.x = 1.7
+    ficha.add(marca)
+  }
+  const fichaAlvo = alvo(scene, refs.ficha, [bandeja, haste, ficha], 0, 0, 0.62)
+  if (intensidade(vestigios, "frio") >= 2) {
+    const gota = new THREE.MeshStandardMaterial({ color: 0xb4ced1, roughness: 0.12, transparent: true, opacity: 0.42 })
+    fichaAlvo.add(mesh(new THREE.SphereGeometry(0.022, 8, 6), gota, 0.23, 0.865, -0.12))
+  }
+  interativos.push(fichaAlvo)
   obstaculos.push(caixa(0, 0.62, 0.68, 0.48))
 
   // Selo fora da ficha, sobre uma gaveta baixa à esquerda.

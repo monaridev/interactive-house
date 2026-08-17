@@ -286,7 +286,7 @@
       tocarClique();
       const jaClicados = new Set(clicados);
       const texto = typeof obj.fala === "function" ? obj.fala(jaClicados) : obj.fala;
-      Estado.registrarClique(salaId, obj.id);
+      Estado.registrarClique(salaId, obj.id, obj.vestigios);
       elemento.classList.add("visitado");
       renderFala(texto, () => renderSala(salaId));
     }

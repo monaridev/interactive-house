@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { caixa } from "./colisao.js"
 import { TEX } from "./texturas.js"
 import { criarPorta } from "./modelos.js"
+import { combinacoesRaras, intensidade } from "./vestigios.js"
 
 // Ambiente A: corredor metálico estreito. O espaço é deliberadamente
 // simples; a irregularidade está nas marcas repetidas, não na arquitetura.
@@ -88,8 +89,10 @@ function criarTrilha(materialCorte) {
   return grupo
 }
 
-export function construirSalaA(scene) {
+export function construirSalaA(scene, ctx = {}) {
   const data = DATA.salas.salaA
+  const vestigios = ctx.vestigios
+  const combinacoes = combinacoesRaras(vestigios, "salaA")
   const refs = Object.fromEntries(data.objetos.map((objeto) => [objeto.id, objeto]))
   const interativos = []
   const obstaculos = []
@@ -132,6 +135,16 @@ export function construirSalaA(scene) {
   alvoParede.position.x = -LARGURA / 2 + 0.086
   alvoParede.add(riscosParede(corte))
   alvoParede.userData = { tipo: "objeto", ref: refs.parede }
+  if (combinacoes.reflexoCortado) {
+    const reflexo = new THREE.MeshStandardMaterial({
+      color: 0x84969b,
+      emissive: 0x728a91,
+      emissiveIntensity: 0.75,
+      roughness: 0.28,
+      metalness: 0.72,
+    })
+    alvoParede.add(mesh(new THREE.BoxGeometry(0.014, 0.012, 0.34), reflexo, 0.008, 1.38, -0.77, 0, -0.02))
+  }
   scene.add(alvoParede)
   interativos.push(alvoParede)
 
@@ -141,6 +154,21 @@ export function construirSalaA(scene) {
   placa.position.set(LARGURA / 2 - 0.105, 1.28, 0.72)
   placa.rotation.set(0, -Math.PI / 2, -0.045)
   placa.scale.set(1, 0.94, 1)
+  if (intensidade(vestigios, "frio") >= 2) {
+    const condensacao = new THREE.MeshStandardMaterial({
+      color: 0xb8d0d3,
+      roughness: 0.12,
+      transparent: true,
+      opacity: 0.3,
+    })
+    for (let i = 0; i < 4; i++) {
+      placa.add(mesh(new THREE.CircleGeometry(0.018 + i * 0.003, 12), condensacao, -0.22 + i * 0.14, 0.12 - (i % 2) * 0.13, 0.038))
+    }
+  }
+  if (intensidade(vestigios, "observacao") >= 2) {
+    const fixacao = new THREE.MeshStandardMaterial({ color: 0x15191a, roughness: 0.22, metalness: 0.65 })
+    placa.add(mesh(new THREE.CircleGeometry(0.024, 16), fixacao, 0.23, 0.18, 0.04))
+  }
   interativos.push(placa)
 
   const ferramenta = criarFerramenta(metalAco, escuro)
@@ -151,6 +179,9 @@ export function construirSalaA(scene) {
   interativos.push(ferramenta)
 
   const trilha = criarTrilha(corte)
+  if (intensidade(vestigios, "ausencia") >= 3 && trilha.children[6]) {
+    trilha.children[6].visible = false
+  }
   trilha.userData = { tipo: "objeto", ref: refs.trilha }
   scene.add(trilha)
   interativos.push(trilha)

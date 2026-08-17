@@ -17,6 +17,28 @@ window.CLUSTERS = CLUSTERS;
 const OBJ_CLUSTER = {};
 Object.keys(CLUSTERS).forEach((c) => CLUSTERS[c].objetos.forEach((id) => { OBJ_CLUSTER[id] = c; }));
 
+// Camada semântica paralela aos clusters. Cluster continua decidindo a rota;
+// vestígios apenas descrevem o que uma interação pode deixar no restante da
+// sessão. Os pesos não são progresso e nunca são exibidos ao visitante.
+const VESTIGIOS_COZINHA = {
+  faca:        { corte: 2, frio: 1 },
+  tesoura:     { corte: 1, ausencia: 1, ordem: 1 },
+  amolador:    { corte: 1, registro: 1 },
+  espeto:      { corte: 1, ausencia: 1, ordem: 1 },
+  garfo:       { domestico: 1, ordem: 2 },
+  panela:      { domestico: 2, ausencia: 1 },
+  tabua:       { domestico: 1, corte: 1, registro: 1 },
+  toalha:      { domestico: 1, ordem: 2, ausencia: 1 },
+  gelo:        { frio: 2, ausencia: 1 },
+  pratovazio:  { ausencia: 2, domestico: 1 },
+  copo:        { frio: 1, ausencia: 1, domestico: 1 },
+  mancha:      { ausencia: 2, registro: 1 },
+  caderno:     { registro: 2, ausencia: 1 },
+  etiqueta:    { registro: 2, ordem: 1 },
+  relogio:     { registro: 1, ordem: 1, ausencia: 1 },
+  camera:      { observacao: 2, registro: 1 }
+};
+
 window.DATA = {
   inicio: "cozinha",
   salas: {
@@ -36,6 +58,7 @@ window.DATA = {
       objetos: [
         {
           id: "faca", nome: "Faca", icone: "faca", cluster: "corte",
+          vestigios: VESTIGIOS_COZINHA.faca,
           fala: (ja) => {
             let t = "O metal está frio. Mais frio do que deveria estar.";
             if (ja.has("tabua")) t += " Ao lado da tábua, o frio parece se espalhar por ela também.";
@@ -44,13 +67,17 @@ window.DATA = {
           }
         },
         { id: "tesoura", nome: "Tesoura", icone: "tesoura", cluster: "corte",
+          vestigios: VESTIGIOS_COZINHA.tesoura,
           fala: "As lâminas estão alinhadas, sem qualquer sinal de uso." },
         { id: "amolador", nome: "Amolador", icone: "amolador", cluster: "corte",
+          vestigios: VESTIGIOS_COZINHA.amolador,
           fala: "A pedra está gasta de um lado só, como se alguém tivesse pressa." },
         { id: "espeto", nome: "Espeto", icone: "espeto", cluster: "corte",
+          vestigios: VESTIGIOS_COZINHA.espeto,
           fala: "Reto demais para já ter sido usado alguma vez." },
         {
           id: "tabua", nome: "Tábua de corte", icone: "tabua", cluster: "domestico",
+          vestigios: VESTIGIOS_COZINHA.tabua,
           fala: (ja) => {
             let t = "Sulcos profundos cobrem toda a extensão da madeira.";
             if (ja.has("faca")) t += " Alguns sulcos têm exatamente a largura da faca ao lado.";
@@ -60,6 +87,7 @@ window.DATA = {
         },
         {
           id: "garfo", nome: "Garfo", icone: "garfo", cluster: "domestico",
+          vestigios: VESTIGIOS_COZINHA.garfo,
           fala: (ja) => {
             let t = "Está alinhado perfeitamente ao centro da bancada.";
             if (ja.has("faca")) t += " A faca, ao lado, não está.";
@@ -68,24 +96,34 @@ window.DATA = {
           }
         },
         { id: "panela", nome: "Panela", icone: "panela", cluster: "domestico",
+          vestigios: VESTIGIOS_COZINHA.panela,
           fala: "Está seca por dentro. Não há marcas de uso recente, nem cheiro de nada." },
         { id: "toalha", nome: "Toalha de mesa", icone: "toalha", cluster: "domestico",
+          vestigios: VESTIGIOS_COZINHA.toalha,
           fala: "Está dobrada em quatro partes iguais, sem uma única marca de uso." },
         { id: "gelo", nome: "Superfície gelada", icone: "gelo", cluster: "vazio",
+          vestigios: VESTIGIOS_COZINHA.gelo,
           fala: "Um ponto da bancada está visivelmente mais frio que o resto. Não há explicação registrada." },
         { id: "pratovazio", nome: "Prato vazio", icone: "pratovazio", cluster: "vazio",
+          vestigios: VESTIGIOS_COZINHA.pratovazio,
           fala: "Está centralizado, como se esperasse algo que não chegou a vir." },
         { id: "copo", nome: "Copo embaçado", icone: "copo", cluster: "vazio",
+          vestigios: VESTIGIOS_COZINHA.copo,
           fala: "Parece ter sido usado há segundos. Está seco por dentro." },
         { id: "mancha", nome: "Mancha apagada", icone: "mancha", cluster: "vazio",
+          vestigios: VESTIGIOS_COZINHA.mancha,
           fala: "Um contorno no chão foi limpo até demais. Ainda é possível vê-lo, se você souber onde olhar." },
         { id: "caderno", nome: "Caderno", icone: "caderno", cluster: "registro",
+          vestigios: VESTIGIOS_COZINHA.caderno,
           fala: "Todas as páginas estão em branco, exceto a última." },
         { id: "etiqueta", nome: "Etiqueta", icone: "etiqueta", cluster: "registro",
+          vestigios: VESTIGIOS_COZINHA.etiqueta,
           fala: "Um número de catalogação sem correspondência em nenhum registro consultado." },
         { id: "relogio", nome: "Relógio parado", icone: "relogio", cluster: "registro",
+          vestigios: VESTIGIOS_COZINHA.relogio,
           fala: "Está parado numa hora que não bate com nenhum outro relógio da casa." },
         { id: "camera", nome: "Câmera pequena", icone: "camera", cluster: "registro",
+          vestigios: VESTIGIOS_COZINHA.camera,
           fala: "A lente está voltada para a bancada. Não há cabo, nem luz de gravação." },
         {
           id: "porta", nome: "Porta", icone: "porta", ehSaida: true,

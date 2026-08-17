@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { caixa } from "./colisao.js"
 import { TEX } from "./texturas.js"
 import { criarPorta } from "./modelos.js"
+import { combinacoesRaras, intensidade } from "./vestigios.js"
 
 // Sala Final — uma pequena sala de avaliação. Diferente da Sala D, o
 // arquivo não domina a arquitetura: há poucos móveis e toda a composição
@@ -20,9 +21,10 @@ function mesh(geometria, material, x, y, z, rx = 0, ry = 0, rz = 0) {
   return objeto
 }
 
-function criarDossie(materiais) {
+function criarDossie(materiais, vestigios, rota) {
   const grupo = new THREE.Group()
   const { pasta, papel, tinta, metal } = materiais
+  const combinacoes = combinacoesRaras(vestigios, rota)
 
   grupo.add(mesh(new THREE.BoxGeometry(0.56, 0.025, 0.39), pasta, 0, 0.013, 0))
   grupo.add(mesh(new THREE.BoxGeometry(0.51, 0.028, 0.35), papel, 0.01, 0.038, -0.005))
@@ -31,11 +33,39 @@ function criarDossie(materiais) {
   grupo.add(mesh(new THREE.BoxGeometry(0.11, 0.005, 0.009), tinta, -0.06, 0.062, -0.025))
   grupo.add(mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.018, 10), metal, 0.22, 0.05, 0.13))
 
+  if (intensidade(vestigios, "corte") >= 2) {
+    const linha = new THREE.MeshStandardMaterial({ color: 0x70433d, roughness: 0.95 })
+    grupo.add(mesh(new THREE.BoxGeometry(0.42, 0.005, 0.009), linha, 0.01, 0.064, 0.085, 0, 0.02, -0.025))
+  }
+  if (intensidade(vestigios, "observacao") >= 2) {
+    const registro = new THREE.MeshStandardMaterial({ color: 0x373a37, roughness: 0.32, metalness: 0.55 })
+    grupo.add(mesh(new THREE.RingGeometry(0.018, 0.025, 16), registro, 0.18, 0.066, -0.1, -Math.PI / 2))
+  }
+  if (combinacoes.reflexoCortado) {
+    const reflexo = new THREE.MeshStandardMaterial({ color: 0x9ba6a3, emissive: 0x687773, emissiveIntensity: 0.48, roughness: 0.2 })
+    grupo.add(mesh(new THREE.BoxGeometry(0.31, 0.004, 0.006), reflexo, -0.04, 0.067, 0.03, 0, 0, 0.04))
+  } else if (combinacoes.fibraMarcada) {
+    const fibra = new THREE.MeshStandardMaterial({ color: 0x713c36, roughness: 0.98 })
+    grupo.add(mesh(new THREE.BoxGeometry(0.26, 0.004, 0.006), fibra, -0.08, 0.067, 0.14, 0, 0, -0.08))
+  } else if (combinacoes.horaCondensada) {
+    const gota = new THREE.MeshStandardMaterial({ color: 0xaec7c8, roughness: 0.12, transparent: true, opacity: 0.38 })
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2
+      grupo.add(mesh(new THREE.SphereGeometry(0.009, 6, 5), gota, 0.16 + Math.cos(a) * 0.045, 0.069, 0.08 + Math.sin(a) * 0.045))
+    }
+  } else if (combinacoes.fichaApagada) {
+    const apagado = new THREE.MeshStandardMaterial({ color: 0x766e5f, roughness: 1, transparent: true, opacity: 0.3 })
+    const marca = mesh(new THREE.RingGeometry(0.035, 0.052, 20), apagado, -0.12, 0.068, 0.01, -Math.PI / 2)
+    marca.scale.x = 1.5
+    grupo.add(marca)
+  }
+
   return grupo
 }
 
-export function construirSalaFinal(scene) {
+export function construirSalaFinal(scene, ctx = {}) {
   const data = DATA.salas.salaFinal
+  const vestigios = ctx.vestigios
   const refDossie = data.objetos.find((objeto) => objeto.id === "dossie")
   const obstaculos = []
   const interativos = []
@@ -48,7 +78,8 @@ export function construirSalaFinal(scene) {
   const metal = new THREE.MeshStandardMaterial({ map: TEX.metal(), color: 0x646b69, roughness: 0.57, metalness: 0.62 })
   const metalEscuro = new THREE.MeshStandardMaterial({ color: 0x303433, roughness: 0.7, metalness: 0.45 })
   const tecido = new THREE.MeshStandardMaterial({ map: TEX.tecido(), color: 0x393b38, roughness: 0.96 })
-  const papel = new THREE.MeshStandardMaterial({ map: TEX.papel(), color: 0xc8bda3, roughness: 0.91 })
+  const corPapel = intensidade(vestigios, "frio") >= 2 ? 0xbfc1b4 : 0xc8bda3
+  const papel = new THREE.MeshStandardMaterial({ map: TEX.papel(), color: corPapel, roughness: 0.91 })
   const pasta = new THREE.MeshStandardMaterial({ color: 0x9a8050, roughness: 0.88 })
   const tinta = new THREE.MeshStandardMaterial({ color: 0x302b24, roughness: 1 })
 
@@ -112,9 +143,9 @@ export function construirSalaFinal(scene) {
   }
 
   // O único objeto interativo.
-  const dossie = criarDossie({ pasta, papel, tinta, metal })
+  const dossie = criarDossie({ pasta, papel, tinta, metal }, vestigios, ctx.rotaFinalId)
   dossie.position.set(0.08, mesaA + 0.055, -0.02)
-  dossie.rotation.y = -0.16
+  dossie.rotation.y = intensidade(vestigios, "ordem") >= 3 ? -0.08 : -0.16
   dossie.userData = { tipo: "dossie", ref: refDossie }
   scene.add(dossie)
   interativos.push(dossie)

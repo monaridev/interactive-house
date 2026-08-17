@@ -28,6 +28,7 @@ import { construirSalaD } from "./sala-d.js"
 import { construirSalaFinal } from "./sala-final.js"
 import { criarSistemaReacoes } from "./reacoes.js"
 import { resolverMovimento, desencaixar } from "./colisao.js"
+import { variacaoDossie } from "./vestigios.js"
 
 // ---------- registro de salas 3D ----------
 // Quando a porta calcula um destino que está aqui, a troca é real (nova
@@ -398,6 +399,7 @@ function dadosDoDossie() {
 
   const comportamento = DATA.comportamentos?.[clusterId] || "Nenhuma conclusão definitiva pode ser extraída."
   const [interpretacao, observacaoFinal] = comportamento.split(/\n\n+/)
+  const vestigios = Estado.snapshotVestigios()
   return {
     id,
     registro: REGISTRO_ID[id] || "41-—",
@@ -406,12 +408,14 @@ function dadosDoDossie() {
     objetosAnalisados: Estado.contarCliques("cozinha"),
     interpretacao,
     observacaoFinal: observacaoFinal || "Nenhuma conclusão definitiva pode ser extraída.",
+    variacao: variacaoDossie(vestigios, id),
   }
 }
 
 function estruturaDocumento(conteudo, pagina) {
+  const classesVestigio = conteudo.variacao.classes.join(" ")
   overlayRelatorio.innerHTML = `
-    <article class="dossie-papel" data-pagina="${pagina}">
+    <article class="dossie-papel ${classesVestigio}" data-pagina="${pagina}">
       <header class="dossie-cabecalho">
         <div><strong>INSTITUTO DE OBSERVAÇÃO E COMPORTAMENTO</strong><span>SETOR DE ANÁLISE · NÚCLEO INTERNO</span></div>
         <div class="dossie-registro"><span>Nº DO REGISTRO</span><strong>${conteudo.registro}</strong><span>${new Date().toLocaleDateString("pt-BR")}</span></div>
@@ -448,6 +452,7 @@ function mostrarPaginaDossie(pagina) {
         <div><dt>Objetos analisados</dt><dd>${conteudo.objetosAnalisados}</dd></div>
       </dl>
       <section><h2>Relatório</h2><p>${conteudo.relatorio}</p></section>
+      ${conteudo.variacao.nota ? `<section class="dossie-nota"><h2>Observação de conferência</h2><p>${conteudo.variacao.nota}</p></section>` : ""}
     `
     navegacao.innerHTML = `<span></span><strong>1 / 2</strong><button type="button" data-proxima>Próxima página →</button>`
     navegacao.querySelector("[data-proxima]").addEventListener("click", () => mostrarPaginaDossie(2))
@@ -549,7 +554,11 @@ function entrarEm(id) {
   scene.add(grupoSalaAtual)
 
   const visita = Estado.contarVisitas(id)
-  sala = SALAS_3D[id](grupoSalaAtual, { visita })
+  sala = SALAS_3D[id](grupoSalaAtual, {
+    visita,
+    vestigios: Estado.snapshotVestigios(),
+    rotaFinalId,
+  })
 
   camera.position.set(sala.spawn.x, sala.spawn.y, sala.spawn.z)
   camera.rotation.set(0, sala.spawn.olharY, 0) // zera inclinação de cabeça herdada da sala anterior
@@ -641,7 +650,7 @@ renderer.domElement.addEventListener("click", () => {
   }
 
   if (tipo === "objeto") {
-    Estado.registrarClique(sala.id, ref.id)
+    Estado.registrarClique(sala.id, ref.id, ref.vestigios)
     if (sala.id === "cozinha") reacoes.disparar(alvo, ref.id)
     const ja = Estado.clicadosDe(sala.id)
     const texto = typeof ref.fala === "function" ? ref.fala(ja) : ref.fala

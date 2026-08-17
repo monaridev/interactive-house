@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { caixa } from "./colisao.js"
 import { TEX } from "./texturas.js"
 import { criarPorta } from "./modelos.js"
+import { combinacoesRaras, intensidade } from "./vestigios.js"
 
 // Ambiente B — o doméstico preservado com cuidado excessivo. A sala não
 // replica a Cozinha: é uma sala de jantar montada para um acontecimento
@@ -30,8 +31,10 @@ function alvo(scene, ref, partes, x = 0, y = 0, z = 0, ry = 0) {
   return grupo
 }
 
-export function construirSalaB(scene) {
+export function construirSalaB(scene, ctx = {}) {
   const data = DATA.salas.salaB
+  const vestigios = ctx.vestigios
+  const combinacoes = combinacoesRaras(vestigios, "salaB")
   const refs = Object.fromEntries(data.objetos.map((objeto) => [objeto.id, objeto]))
   const obstaculos = []
   const interativos = []
@@ -75,11 +78,26 @@ export function construirSalaB(scene) {
     mesaPartes.push(mesh(new THREE.CylinderGeometry(0.13, 0.1, 0.025, 24), louca, 0, 0.835, z))
     for (const x of [-0.22, 0.22]) mesaPartes.push(mesh(new THREE.BoxGeometry(0.018, 0.012, 0.28), metal, x, 0.85, z))
   }
-  interativos.push(alvo(scene, refs.mesa, mesaPartes, -0.18, 0, -0.05))
+  const mesa = alvo(scene, refs.mesa, mesaPartes, -0.18, 0, -0.05)
+  if (intensidade(vestigios, "registro") >= 2) {
+    const papel = new THREE.MeshStandardMaterial({ color: 0xb7ad96, roughness: 0.94 })
+    const tinta = new THREE.MeshStandardMaterial({ color: 0x3d3932, roughness: 1 })
+    mesa.add(mesh(new THREE.BoxGeometry(0.2, 0.008, 0.1), papel, 0.52, 0.837, -0.64, 0, 0.08))
+    mesa.add(mesh(new THREE.BoxGeometry(0.11, 0.003, 0.008), tinta, 0.52, 0.844, -0.64, 0, 0.08))
+  }
+  interativos.push(mesa)
   obstaculos.push(caixa(-0.18, -0.05, 1.58, 2.15))
 
   const toalha = alvo(scene, refs.toalha, [mesh(new THREE.BoxGeometry(1.48, 0.018, 2.03), tecido, 0, 0.826, 0)])
   toalha.position.set(-0.18, 0, -0.05)
+  if (intensidade(vestigios, "corte") >= 2) {
+    const corFibra = combinacoes.fibraMarcada ? 0x713c36 : 0x4b4439
+    const fibra = new THREE.MeshStandardMaterial({ color: corFibra, roughness: 0.96 })
+    toalha.add(mesh(new THREE.BoxGeometry(1.12, 0.005, 0.012), fibra, 0.02, 0.839, -0.94, 0, 0, -0.01))
+    if (combinacoes.fibraMarcada) {
+      toalha.add(mesh(new THREE.BoxGeometry(0.34, 0.004, 0.009), fibra, -0.29, 0.841, -0.91, 0, 0.05))
+    }
+  }
   interativos.push(toalha)
 
   // Cadeira isolada no lado norte, virada de costas para a entrada.
@@ -98,7 +116,12 @@ export function construirSalaB(scene) {
     mesh(new THREE.CylinderGeometry(0.052, 0.038, 0.14, 20, 1, true), vidro, 0, 0.9, 0),
     mesh(new THREE.RingGeometry(0.041, 0.052, 20), vidro, 0, 0.973, 0, -Math.PI / 2),
   ]
-  interativos.push(alvo(scene, refs.copo, copoPartes, 0.34, 0, 0.62))
+  const copo = alvo(scene, refs.copo, copoPartes, 0.34, 0, 0.62)
+  if (intensidade(vestigios, "observacao") >= 2) {
+    const reflexo = new THREE.MeshStandardMaterial({ color: 0xdbe4e1, emissive: 0x6f8584, emissiveIntensity: 0.35, roughness: 0.12 })
+    copo.add(mesh(new THREE.RingGeometry(0.026, 0.032, 18), reflexo, 0, 0.982, 0, -Math.PI / 2))
+  }
+  interativos.push(copo)
 
   const porta = criarPorta(portaL - 0.06, portaA - 0.04)
   porta.position.set(0, 0, -mz + 0.08)
@@ -117,6 +140,11 @@ export function construirSalaB(scene) {
   const luzPorta = new THREE.PointLight(0xaab9c4, 1.65, 3.4, 2)
   luzPorta.position.set(0, 1.75, -mz + 0.35)
   scene.add(luzPorta)
+  if (intensidade(vestigios, "frio") >= 2) {
+    const reflexoFrio = new THREE.PointLight(0xa8c8d2, 0.55, 1.45, 2)
+    reflexoFrio.position.set(0.34, 1.02, 0.62)
+    scene.add(reflexoFrio)
+  }
 
   return {
     id: "salaB",

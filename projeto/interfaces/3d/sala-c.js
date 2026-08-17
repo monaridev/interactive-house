@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { caixa } from "./colisao.js"
 import { TEX } from "./texturas.js"
 import { criarPorta } from "./modelos.js"
+import { combinacoesRaras, intensidade } from "./vestigios.js"
 
 // Ambiente C — vazio/ausência. A arquitetura continua navegável, mas as
 // superfícies são compostas por planos desalinhados, sem virar um cenário
@@ -26,8 +27,10 @@ function tornarAlvo(scene, ref, grupo) {
   return grupo
 }
 
-export function construirSalaC(scene) {
+export function construirSalaC(scene, ctx = {}) {
   const data = DATA.salas.salaC
+  const vestigios = ctx.vestigios
+  const combinacoes = combinacoesRaras(vestigios, "salaC")
   const refs = Object.fromEntries(data.objetos.map((objeto) => [objeto.id, objeto]))
   const obstaculos = []
   const interativos = []
@@ -74,6 +77,14 @@ export function construirSalaC(scene) {
     paredeAlvo.add(mesh(new THREE.CircleGeometry(raio, 24), mancha, 0.001, 0.3 + i * 0.31, (i % 2 ? 0.06 : -0.04), 0, Math.PI / 2))
   }
   paredeAlvo.position.set(-mx + 0.087, 0, -0.72)
+  if (intensidade(vestigios, "corte") >= 2) {
+    const linha = new THREE.MeshStandardMaterial({ color: 0x20282a, roughness: 0.96 })
+    paredeAlvo.add(mesh(new THREE.BoxGeometry(0.012, 0.014, 0.86), linha, 0.01, 1.08, 0.02, 0.03, 0.02, 0.02))
+  }
+  if (intensidade(vestigios, "registro") >= 2) {
+    const etiqueta = new THREE.MeshStandardMaterial({ color: 0x9ca6a2, roughness: 0.92 })
+    paredeAlvo.add(mesh(new THREE.BoxGeometry(0.012, 0.18, 0.31), etiqueta, 0.012, 0.58, -0.18, 0, 0.04, -0.08))
+  }
   tornarAlvo(scene, refs.parede, paredeAlvo)
   interativos.push(paredeAlvo)
 
@@ -108,6 +119,28 @@ export function construirSalaC(scene) {
   chaoAlvo.add(frio)
   tornarAlvo(scene, refs.chao, chaoAlvo)
   interativos.push(chaoAlvo)
+
+  // Uma área seca com proporções domésticas, mas sem móvel correspondente.
+  if (intensidade(vestigios, "domestico") >= 3) {
+    const seco = new THREE.MeshStandardMaterial({ color: 0x788183, roughness: 1, transparent: true, opacity: 0.36 })
+    scene.add(mesh(new THREE.PlaneGeometry(0.92, 0.54), seco, 1.05, 0.014, -0.18, -Math.PI / 2, 0, 0.02))
+  }
+
+  if (combinacoes.horaCondensada) {
+    const gotaCircular = new THREE.MeshStandardMaterial({ color: 0xb7cccf, roughness: 0.16, transparent: true, opacity: 0.42 })
+    for (let i = 0; i < 12; i++) {
+      const angulo = (i / 12) * Math.PI * 2
+      const gota = mesh(
+        new THREE.SphereGeometry(0.017, 7, 6),
+        gotaCircular,
+        mx - 0.092,
+        1.38 + Math.sin(angulo) * 0.29,
+        -1.02 + Math.cos(angulo) * 0.29,
+      )
+      gota.scale.x = 0.45
+      scene.add(gota)
+    }
+  }
 
   const porta = criarPorta(portaL - 0.06, portaA - 0.04)
   porta.position.set(0, 0, -mz + 0.09)

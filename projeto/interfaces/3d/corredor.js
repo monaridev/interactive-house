@@ -13,6 +13,7 @@ import * as THREE from "three"
 import { TEX } from "./texturas.js"
 import { criarPorta } from "./modelos.js"
 import { caixa, segmento } from "./colisao.js"
+import { intensidade, temOrigem } from "./vestigios.js"
 
 // ---------- dimensões ----------
 // Bem mais estreito e mais baixo que a Cozinha (2,70m) — de propósito:
@@ -61,6 +62,10 @@ function jitter(seed, amplitude) {
 
 export function construirCorredor(scene, ctx = {}) {
   const visita = ctx.visita || 0 // quantas vezes o corredor já foi visitado ANTES desta
+  const vestigios = ctx.vestigios
+  const frio = Math.min(intensidade(vestigios, "frio"), 4)
+  const ausencia = Math.min(intensidade(vestigios, "ausencia"), 5)
+  const ordem = Math.min(intensidade(vestigios, "ordem"), 6)
   const obstaculos = []
   const interativos = []
 
@@ -197,8 +202,9 @@ export function construirCorredor(scene, ctx = {}) {
   // O seed é o número de visitas — determinístico (F5 no meio não
   // muda nada), mas cada volta ao corredor é um seed novo.
   const portaSaida = criarPorta(LARGURA_PORTA - 0.06, ALTURA_PORTA - 0.04)
-  const anguloBase = 0.14
-  const anguloJitter = jitter(visita * 7.31 + 1, 0.06) // ±0,06 rad ≈ ±3,4°
+  const anguloBase = 0.14 + ausencia * 0.006
+  const fatorOrdem = Math.max(0.38, 1 - ordem * 0.1)
+  const anguloJitter = jitter(visita * 7.31 + 1, 0.06) * fatorOrdem // ordem excessiva reduz a variação
   const desloceJitter = jitter(visita * 3.53 + 5, 0.012) // ±12mm ao longo do batente
   portaSaida.position.set(
     P2.x + perpSaida.x * desloceJitter,
@@ -207,6 +213,17 @@ export function construirCorredor(scene, ctx = {}) {
   )
   portaSaida.rotation.y = ANGULO_2 + anguloBase + anguloJitter
   portaSaida.userData = { tipo: "porta", ref: porta }
+
+  // Só aparece quando a pequena câmera foi examinada: um disco escuro no
+  // alto da folha, pequeno demais para confirmar se é lente ou fixação.
+  if (temOrigem(vestigios, "camera")) {
+    const olho = new THREE.Mesh(
+      new THREE.CircleGeometry(0.018, 16),
+      new THREE.MeshStandardMaterial({ color: 0x15191a, roughness: 0.18, metalness: 0.55 }),
+    )
+    olho.position.set(-0.12, 1.55, 0.028)
+    portaSaida.add(olho)
+  }
   scene.add(portaSaida)
   interativos.push(portaSaida)
 
@@ -216,14 +233,15 @@ export function construirCorredor(scene, ctx = {}) {
   // pontas: as portas (entrada e saída) ficam sempre um pouco mal
   // iluminadas, o oposto da Cozinha, onde a luz busca os objetos.
   scene.add(new THREE.AmbientLight(0x2a2c30, 0.35))
-  const lampada = new THREE.PointLight(0xdfe6ec, 3.4, 4.6, 2)
+  const corLampada = frio >= 2 ? 0xc8e0e7 : 0xdfe6ec
+  const lampada = new THREE.PointLight(corLampada, 3.4 + frio * 0.12, 4.6, 2)
   lampada.position.set(P1.x, PE_DIREITO - 0.15, P1.z)
   lampada.castShadow = true
   lampada.shadow.mapSize.set(512, 512)
   scene.add(lampada)
   const bulbo = new THREE.Mesh(
     new THREE.SphereGeometry(0.025, 10, 8),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xcfd8e0, emissiveIntensity: 1.8 }),
+    new THREE.MeshStandardMaterial({ color: corLampada, emissive: corLampada, emissiveIntensity: 1.8 + frio * 0.08 }),
   )
   bulbo.position.copy(lampada.position)
   scene.add(bulbo)
@@ -241,7 +259,11 @@ export function construirCorredor(scene, ctx = {}) {
     spawn: { x: P0.x, y: 1.65, z: P0.z + DIR_1.z * 0.8, olharY: ANGULO_1 },
     // No corredor a mesma frequência migra para trás da parede na quebra,
     // sugerindo continuidade física sem revelar a origem ao jogador.
-    fonteSom: { x: P1.x - 0.72, y: 1.05, z: P1.z + 0.18 },
+    fonteSom: {
+      x: P1.x - 0.72 - Math.min(intensidade(vestigios, "observacao"), 2) * 0.035,
+      y: 1.05,
+      z: P1.z + 0.18 + ausencia * 0.012,
+    },
     limites: { peDireito: PE_DIREITO },
   }
 }
