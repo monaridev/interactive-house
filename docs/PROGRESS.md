@@ -872,3 +872,33 @@ estado no servidor estático.
 real da Cozinha, alcance do raycast, volume dos sons, intensidade dos efeitos
 de tela e execução completa de cada reação. Não houve teste visual WebGL ou de
 áudio real nesta sessão.
+
+### 17/08/2026 — Sessão 24 (modo de apresentação/debug)
+
+- **Ativação isolada** (`main.js`): `?apresentacao=1` instala o modo; sem esse
+  valor exato, nenhum atalho, indicador ou objeto global adicional é criado.
+- **Acesso rápido:** teclas `1`–`7` levam diretamente à Cozinha, Corredor,
+  Ambientes A–D e Sala Final reutilizando `entrarEm()`. A troca limpa teclas e
+  contorno, mas não altera Pointer Lock, HUD, raycast, rotas ou módulos de sala.
+- **Sala Final segura:** a última sala de desfecho selecionada alimenta o
+  dossiê; quando a Sala Final é aberta sem rota anterior, Ambiente A fornece um
+  conteúdo válido e previsível apenas no modo de apresentação.
+- **Reset:** `R` recarrega a mesma URL e zera o estado em memória da rodada,
+  conforme o comportamento já definido por `core/estado.js`.
+- **Interface e debug:** um indicador discreto com os atalhos é criado por
+  JavaScript somente nesse modo. `window.__apresentacao.ir()` e
+  `window.__apresentacao.resetar()` também só existem com o parâmetro ativo.
+- **Documentação:** o uso e os atalhos foram registrados no `README.md`.
+
+**Validação realizada:** `node --check` em todos os JavaScripts, resolução de
+imports locais, parsing do HTML e `git diff --check`; servidor local respondeu
+corretamente; no navegador, `1`–`7` abriram as sete salas esperadas, `R`
+reiniciou na Cozinha preservando o parâmetro, e a URL normal ignorou `2`, não
+mostrou indicador e não registrou erros de console durante esse fluxo.
+
+**Teste manual restante:** confirmar no navegador da apresentação o Pointer
+Lock real durante os saltos, teclado numérico, movimento WASD, raycast/HUD após
+várias trocas e os fluxos completos de porta → Sala Final → dossiê e final
+apressado. O navegador automatizado preservou o Pointer Lock no salto testado,
+mas emitiu avisos internos inconsistentes da API do Chromium, então essa parte
+não foi considerada validação manual definitiva.

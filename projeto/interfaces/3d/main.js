@@ -681,6 +681,82 @@ renderer.domElement.addEventListener("click", () => {
   }
 })
 
+// ---------- modo apresentação (?apresentacao=1) ----------
+// Atalhos para demonstração e QA, instalados somente quando o parâmetro
+// possui exatamente o valor "1". O fluxo normal não recebe listeners,
+// elementos de interface nem funções globais adicionais.
+if (new URLSearchParams(location.search).get("apresentacao") === "1") {
+  const ATALHOS_APRESENTACAO = {
+    Digit1: "cozinha",
+    Numpad1: "cozinha",
+    Digit2: "corredor",
+    Numpad2: "corredor",
+    Digit3: "salaA",
+    Numpad3: "salaA",
+    Digit4: "salaB",
+    Numpad4: "salaB",
+    Digit5: "salaC",
+    Numpad5: "salaC",
+    Digit6: "salaD",
+    Numpad6: "salaD",
+    Digit7: "salaFinal",
+    Numpad7: "salaFinal",
+  }
+
+  function irParaSalaApresentacao(id) {
+    if (!SALAS_3D[id] || leituraAberta || transicao) return false
+
+    // A Sala Final precisa conhecer a rota que alimentará o dossiê. Ao
+    // visitar diretamente A-D, essa escolha acompanha o apresentador;
+    // sem escolha anterior, A fornece um conteúdo válido e previsível.
+    if (SALAS_DESFECHO.has(id)) rotaFinalId = id
+    if (id === "salaFinal" && !SALAS_DESFECHO.has(rotaFinalId)) rotaFinalId = "salaA"
+
+    Object.keys(teclas).forEach((k) => (teclas[k] = false))
+    outlinePass.selectedObjects = []
+    entrarEm(id)
+    return true
+  }
+
+  function resetarApresentacao() {
+    location.reload()
+  }
+
+  addEventListener("keydown", (e) => {
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+    if (e.code === "KeyR") {
+      resetarApresentacao()
+      return
+    }
+    const destino = ATALHOS_APRESENTACAO[e.code]
+    if (destino) irParaSalaApresentacao(destino)
+  })
+
+  const indicador = document.createElement("aside")
+  indicador.setAttribute("aria-label", "Atalhos do modo apresentação")
+  indicador.style.cssText = [
+    "position:fixed",
+    "right:14px",
+    "top:14px",
+    "z-index:30",
+    "max-width:290px",
+    "padding:8px 10px",
+    "border:1px solid rgba(255,255,255,.2)",
+    "background:rgba(8,8,10,.72)",
+    "color:rgba(255,255,255,.72)",
+    "font:10px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace",
+    "letter-spacing:.04em",
+    "pointer-events:none",
+  ].join(";")
+  indicador.textContent = "MODO APRESENTAÇÃO · 1 Cozinha · 2 Corredor · 3–6 Salas A–D · 7 Sala Final · R Reset"
+  document.body.append(indicador)
+
+  window.__apresentacao = {
+    ir: irParaSalaApresentacao,
+    resetar: resetarApresentacao,
+  }
+}
+
 // ---------- modo inspeção (?inspecao=1) ----------
 // Ferramenta de desenvolvimento, desligada por padrão. Pointer lock não
 // funciona em navegador headless, então sem isso não há como conferir se
