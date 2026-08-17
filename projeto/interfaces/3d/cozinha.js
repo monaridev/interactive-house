@@ -10,12 +10,13 @@
 import * as THREE from "three"
 import { TEX } from "./texturas.js"
 import { criarModelo, criarPorta, DECALQUES } from "./modelos.js"
-import { caixa, segmento } from "./colisao.js"
+import { caixa, cilindro } from "./colisao.js"
 
 // ---------- dimensões ----------
-// Planta real de referência que o Diogo trouxe: 4,28m x 3,28m.
-const LARGURA = 4.28 // eixo X
-const PROFUNDIDADE = 3.28 // eixo Z
+// Evolução moderada da planta anterior (4,28 x 3,28m). A sala ganha ar para
+// circulação ao redor da ilha sem deixar de parecer uma cozinha doméstica.
+const LARGURA = 5.4 // eixo X
+const PROFUNDIDADE = 4.2 // eixo Z
 // Pé-direito: 2,70m. Antes era 2,60 marcado como "chute". 2,70 é a altura
 // livre residencial mais comum no Brasil (a NBR 15575 exige no mínimo
 // 2,50 em área de permanência prolongada, e 2,70 é o que se constrói).
@@ -29,7 +30,7 @@ const ESPESSURA_PAREDE = 0.12
 
 const LARGURA_PORTA = 0.9
 const ALTURA_PORTA = 2.05
-const PORTA_OFFSET_X = -0.9 // fora do centro da parede norte
+const PORTA_OFFSET_X = -1.7 // fora do centro da parede norte
 
 // bancada
 const BANCADA_PROF = 0.6
@@ -37,117 +38,25 @@ const BANCADA_ALTURA = 0.86
 const TAMPO_ESP = 0.04
 const ALTURA_TAMPO = BANCADA_ALTURA + TAMPO_ESP // 0.90 — onde os objetos apoiam
 
-// estante
-const ALTURA_PRATELEIRA = 1.5
-const PRATELEIRA_ESP = 0.04
-const ALTURA_APOIO_PRATELEIRA = ALTURA_PRATELEIRA + PRATELEIRA_ESP
+// A bancada principal é uma composição interrompida: pia, vazio do fogão,
+// apoio e módulo alto. As medidas explícitas fazem geometria, colisão e
+// narrativa compartilharem a mesma planta.
+const BANCADA_PIA = { x: -0.48, z: -META_Z + BANCADA_PROF / 2, largura: 1.28, profundidade: BANCADA_PROF }
+const VAO_FOGAO = { x: 0.54, z: -META_Z + BANCADA_PROF / 2, largura: 0.76, profundidade: BANCADA_PROF }
+const BANCADA_APOIO = { x: 1.34, z: -META_Z + BANCADA_PROF / 2, largura: 0.84, profundidade: BANCADA_PROF }
+const MODULO_ALTO = { x: 2.23, z: -META_Z + 0.34, largura: 0.78, profundidade: 0.68, altura: 2.24 }
+const BANCADA_FRIA = { x: META_X - BANCADA_PROF / 2, z: 0.82, largura: BANCADA_PROF, profundidade: 1.22 }
 
-// mesa retangular (planta do Diogo). Posição validada por simulação
-// (BFS numa grade de 5cm, reaproveitando resolverMovimento/colide de
-// colisao.js): com estas medidas a área livre da sala continua sendo
-// uma região só, sem bolsão isolado, com ~1m de corredor livre pro
-// lado leste e ~0,7m pros lados norte/sul — folga de verdade, não só
-// o suficiente pra não colidir.
-const MESA_X = -0.25
-const MESA_Z = 0
-const MESA_LARGURA = 1.0 // eixo X
-const MESA_PROFUNDIDADE = 0.65 // eixo Z
-const MESA_ALTURA = 0.76 // tampo — mesa de jantar, mais baixa que a bancada (0,90)
-const MESA_TAMPO_ESP = 0.04
-
-// ---------- caminho da bancada ----------
-// A bancada é uma POLILINHA, não uma lista de móveis. Ela contorna três
-// paredes (norte à direita da porta, leste inteira, sul parcial) e os
-// objetos são distribuídos ao longo dela. Mudar o formato do balcão =
-// mudar estes 4 pontos, e os 10 objetos se redistribuem sozinhos.
-const CAMINHO_BANCADA = [
-  { x: PORTA_OFFSET_X + LARGURA_PORTA / 2 + 0.28, z: -META_Z + BANCADA_PROF / 2 },
-  { x: META_X - BANCADA_PROF / 2, z: -META_Z + BANCADA_PROF / 2 },
-  { x: META_X - BANCADA_PROF / 2, z: META_Z - BANCADA_PROF / 2 },
-  { x: 0.1, z: META_Z - BANCADA_PROF / 2 },
+// Ilha compacta, deslocada para preservar um eixo livre entre spawn e porta.
+const ILHA = { x: -0.22, z: 0.05, largura: 1.62, profundidade: 0.78, altura: 0.88 }
+const BANCOS = [
+  { x: -0.72, z: 0.72 },
+  { x: -0.18, z: 0.72 },
 ]
+const LUGAR_AUSENTE = { x: 0.36, z: 0.72 }
 
-// Distribui pesos uniformemente ao longo da polilinha, devolvendo
-// também o ÂNGULO do trecho. O ângulo é novo e importa: sem ele, todo
-// objeto ficava apontando pro mesmo lado, e uma faca atravessada na
-// bancada leste denunciava na hora que a cena era gerada por script.
-//
-// "Pesos" em vez de "n objetos": um peso de valor 1 é um objeto, um
-// peso maior que 1 é um respiro sem objeto nenhum. É o que faz
-// GRUPOS_BANCADA virar de verdade "grupos com espaço entre eles" em
-// vez de só mudar a ORDEM — sem isso, reordenar o array não muda a
-// distância entre os objetos, porque a distribuição já era uniforme.
-function distribuirPesos(pontos, pesos) {
-  const trechos = []
-  let total = 0
-  for (let i = 0; i < pontos.length - 1; i++) {
-    const a = pontos[i]
-    const b = pontos[i + 1]
-    const comprimento = Math.hypot(b.x - a.x, b.z - a.z)
-    trechos.push({ a, b, comprimento, angulo: Math.atan2(b.x - a.x, b.z - a.z) })
-    total += comprimento
-  }
-  const somaPesos = pesos.reduce((s, p) => s + p, 0)
-  const resultado = []
-  let acumulado = 0
-  for (const peso of pesos) {
-    const centro = acumulado + peso / 2 // centraliza cada item no meio do seu próprio peso
-    acumulado += peso
-    let alvo = total * (centro / somaPesos)
-    for (const t of trechos) {
-      if (alvo <= t.comprimento || t === trechos[trechos.length - 1]) {
-        const f = t.comprimento === 0 ? 0 : alvo / t.comprimento
-        resultado.push({ x: t.a.x + (t.b.x - t.a.x) * f, z: t.a.z + (t.b.z - t.a.z) * f, angulo: t.angulo })
-        break
-      }
-      alvo -= t.comprimento
-    }
-  }
-  return resultado
-}
-
-// Distribui objetos AGRUPADOS ao longo do caminho, com um respiro sem
-// objeto entre um grupo e o próximo. `gap` é o peso desse respiro, em
-// unidades de "um objeto" — 1.4 dá uma pausa perceptível sem esvaziar
-// demais um balcão de 4,3m.
-function distribuirGrupos(pontos, grupos, gap = 1.4) {
-  const pesos = []
-  const ids = []
-  grupos.forEach((grupo, i) => {
-    if (i > 0) pesos.push(gap)
-    for (const id of grupo) {
-      pesos.push(1)
-      ids.push(id)
-    }
-  })
-  const posicoes = distribuirPesos(pontos, pesos)
-  // posicoes tem uma entrada a mais que ids pra cada respiro — filtra
-  // pegando só as que correspondem a peso 1 (objeto), na mesma ordem
-  const resultado = {}
-  let cursorId = 0
-  pesos.forEach((peso, i) => {
-    if (peso !== 1) return
-    resultado[ids[cursorId]] = posicoes[i]
-    cursorId++
-  })
-  return resultado
-}
-
-// Objetos da bancada agrupados por ESTAÇÃO real de cozinha, não pelo
-// cluster narrativo (corte/domestico/vazio — esses continuam decidindo
-// o final em dados.js, sem mudar nada). Um cluster pode aparecer
-// espalhado entre duas estações, e uma estação pode misturar clusters
-// — é assim que uma bancada de verdade se organiza: por USO, não pela
-// categoria que o roteiro usa por trás.
-const GRUPOS_BANCADA = [
-  ["faca", "tabua", "tesoura", "amolador", "espeto"], // estação de corte
-  ["panela", "garfo", "toalha", "copo"], // mesa posta / serviço
-  ["gelo"], // sozinho, de propósito — a fala dele já diz que é uma
-  // anomalia ("um ponto está mais frio, sem explicação"); ficar
-  // isolado no fim do balcão, sem vizinho, reforça isso em vez de
-  // escondê-lo no meio de uma estação que faz sentido
-]
-const OBJETOS_PRATELEIRA = ["caderno", "etiqueta", "relogio", "camera"]
+// Estante aberta e rasa: bloqueia o corpo, mas não toma o corredor oeste.
+const ESTANTE = { x: -META_X + 0.18, z: 0.12, largura: 0.36, profundidade: 1.82, altura: 1.9 }
 
 export function construirCozinha(scene) {
   const obstaculos = []
@@ -281,126 +190,192 @@ export function construirCozinha(scene) {
     m.rotation.y = ry
     scene.add(m)
   }
-  const compNorte = META_X - bordaDirPorta
-  painelAzulejo(compNorte, bordaDirPorta + compNorte / 2, -META_Z + 0.005, 0)
-  painelAzulejo(PROFUNDIDADE, META_X - 0.005, 0, -Math.PI / 2)
-  const compSul = META_X - -0.2
-  painelAzulejo(compSul, -0.2 + compSul / 2, META_Z - 0.005, Math.PI)
+  const inicioPainelNorte = BANCADA_PIA.x - BANCADA_PIA.largura / 2
+  const fimPainelNorte = BANCADA_APOIO.x + BANCADA_APOIO.largura / 2
+  painelAzulejo(fimPainelNorte - inicioPainelNorte, (inicioPainelNorte + fimPainelNorte) / 2, -META_Z + 0.005, 0)
+  painelAzulejo(BANCADA_FRIA.profundidade, META_X - 0.005, BANCADA_FRIA.z, -Math.PI / 2)
 
-  // ---------- bancada ----------
-  function segmentoBancada(a, b) {
-    const comprimento = Math.hypot(b.x - a.x, b.z - a.z)
-    const angulo = Math.atan2(b.x - a.x, b.z - a.z)
-    const cxm = (a.x + b.x) / 2
-    const czm = (a.z + b.z) / 2
-
-    // corpo de armário, recuado do chão (pé de armário de verdade)
+  // ---------- bancada interrompida ----------
+  function criarBancada({ x, z, largura, profundidade }, frente) {
     const corpo = new THREE.Mesh(
-      new THREE.BoxGeometry(BANCADA_PROF - 0.04, BANCADA_ALTURA - 0.09, comprimento + BANCADA_PROF - 0.02),
+      new THREE.BoxGeometry(largura - 0.04, BANCADA_ALTURA - 0.09, profundidade - 0.04),
       matArmario,
     )
-    corpo.position.set(cxm, 0.09 + (BANCADA_ALTURA - 0.09) / 2, czm)
-    corpo.rotation.y = angulo
+    corpo.position.set(x, 0.09 + (BANCADA_ALTURA - 0.09) / 2, z)
     corpo.castShadow = true
     corpo.receiveShadow = true
     scene.add(corpo)
 
-    // tampo em pedra, com beiral saliente
-    const tampo = new THREE.Mesh(
-      new THREE.BoxGeometry(BANCADA_PROF, TAMPO_ESP, comprimento + BANCADA_PROF),
-      matTampo,
-    )
-    tampo.position.set(cxm, BANCADA_ALTURA + TAMPO_ESP / 2, czm)
-    tampo.rotation.y = angulo
+    const tampo = new THREE.Mesh(new THREE.BoxGeometry(largura, TAMPO_ESP, profundidade), matTampo)
+    tampo.position.set(x, BANCADA_ALTURA + TAMPO_ESP / 2, z)
     tampo.castShadow = true
     tampo.receiveShadow = true
     scene.add(tampo)
 
-    // puxadores ao longo do segmento
-    const nPortas = Math.max(1, Math.round(comprimento / 0.5))
-    for (let i = 0; i < nPortas; i++) {
-      const f = (i + 0.5) / nPortas
-      const px = a.x + (b.x - a.x) * f
-      const pz = a.z + (b.z - a.z) * f
-      const puxador = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.012, 0.11), matMetalFosco)
-      // deslocado pra face que olha pro centro do cômodo
-      const normal = new THREE.Vector3(Math.cos(angulo), 0, -Math.sin(angulo))
-      const paraCentro = new THREE.Vector3(-px, 0, -pz).normalize()
-      const sinal = normal.dot(paraCentro) >= 0 ? 1 : -1
-      puxador.position.set(
-        px + normal.x * sinal * (BANCADA_PROF / 2 - 0.01),
-        BANCADA_ALTURA - 0.16,
-        pz + normal.z * sinal * (BANCADA_PROF / 2 - 0.01),
+    const aoLongoDeX = frente === "sul"
+    const quantidade = Math.max(1, Math.round((aoLongoDeX ? largura : profundidade) / 0.48))
+    for (let i = 0; i < quantidade; i++) {
+      const f = (i + 0.5) / quantidade - 0.5
+      const puxador = new THREE.Mesh(
+        new THREE.BoxGeometry(aoLongoDeX ? 0.12 : 0.012, 0.012, aoLongoDeX ? 0.012 : 0.12),
+        matMetalFosco,
       )
-      puxador.rotation.y = angulo
+      puxador.position.set(
+        x + (aoLongoDeX ? f * largura : -largura / 2 + 0.01),
+        BANCADA_ALTURA - 0.16,
+        z + (aoLongoDeX ? profundidade / 2 - 0.01 : f * profundidade),
+      )
       scene.add(puxador)
     }
-
-    obstaculos.push(segmento(a, b, BANCADA_PROF))
+    obstaculos.push(caixa(x, z, largura, profundidade))
   }
-  for (let i = 0; i < CAMINHO_BANCADA.length - 1; i++) {
-    segmentoBancada(CAMINHO_BANCADA[i], CAMINHO_BANCADA[i + 1])
+  criarBancada(BANCADA_PIA, "sul")
+  criarBancada(BANCADA_APOIO, "sul")
+  criarBancada(BANCADA_FRIA, "oeste")
+
+  // Pia simples: uma cuba escura e uma torneira arqueada são suficientes
+  // para a parede principal ser lida como cozinha, sem aumentar o nível de detalhe.
+  const matCuba = new THREE.MeshStandardMaterial({ color: 0x555b5d, roughness: 0.3, metalness: 0.72 })
+  const cuba = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.025, 0.34), matCuba)
+  cuba.position.set(BANCADA_PIA.x - 0.4, ALTURA_TAMPO + 0.009, BANCADA_PIA.z)
+  scene.add(cuba)
+  const fundoCuba = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.012, 0.27), new THREE.MeshStandardMaterial({ color: 0x303537, roughness: 0.42, metalness: 0.55 }))
+  fundoCuba.position.set(BANCADA_PIA.x - 0.4, ALTURA_TAMPO + 0.023, BANCADA_PIA.z)
+  scene.add(fundoCuba)
+  const baseTorneira = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.021, 0.18, 12), matMetalFosco)
+  baseTorneira.position.set(BANCADA_PIA.x - 0.4, ALTURA_TAMPO + 0.09, BANCADA_PIA.z - 0.2)
+  scene.add(baseTorneira)
+  const arcoTorneira = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.009, 8, 18, Math.PI), matMetalFosco)
+  arcoTorneira.position.set(BANCADA_PIA.x - 0.4, ALTURA_TAMPO + 0.17, BANCADA_PIA.z - 0.13)
+  arcoTorneira.rotation.y = Math.PI / 2
+  scene.add(arcoTorneira)
+
+  // Vão do fogão ausente. Nada bloqueia esse espaço: a diferença de parede,
+  // a marca retangular no piso e dois pontos de instalação fazem o vazio
+  // parecer funcional, não um trecho que o código esqueceu de modelar.
+  const matAusencia = new THREE.MeshStandardMaterial({ color: 0x68655d, roughness: 1, transparent: true, opacity: 0.24 })
+  const sombraParede = new THREE.Mesh(new THREE.PlaneGeometry(VAO_FOGAO.largura - 0.05, 1.18), matAusencia)
+  sombraParede.position.set(VAO_FOGAO.x, 0.63, -META_Z + 0.008)
+  scene.add(sombraParede)
+  const marcaPiso = new THREE.Mesh(new THREE.PlaneGeometry(VAO_FOGAO.largura - 0.06, VAO_FOGAO.profundidade - 0.05), matAusencia.clone())
+  marcaPiso.material.opacity = 0.32
+  marcaPiso.rotation.x = -Math.PI / 2
+  marcaPiso.position.set(VAO_FOGAO.x, 0.003, VAO_FOGAO.z)
+  scene.add(marcaPiso)
+  for (const x of [VAO_FOGAO.x - 0.12, VAO_FOGAO.x + 0.12]) {
+    const ponto = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.025, 10), matMetalFosco)
+    ponto.position.set(x, 0.32, -META_Z + 0.02)
+    ponto.rotation.x = Math.PI / 2
+    scene.add(ponto)
   }
 
-  // ---------- estante (parede oeste) ----------
-  const zPrat0 = -META_Z + 0.55
-  const zPrat1 = META_Z - 0.55
-  const compPrateleira = zPrat1 - zPrat0 + 0.5
-  const matPrateleira = new THREE.MeshStandardMaterial({
-    map: TEX.madeiraEscura(1, 3),
-    color: 0x6a5e4d,
-    roughness: 0.82,
-  })
-  const prateleira = new THREE.Mesh(
-    new THREE.BoxGeometry(0.28, PRATELEIRA_ESP, compPrateleira),
-    matPrateleira,
-  )
-  prateleira.position.set(-META_X + 0.14, ALTURA_PRATELEIRA + PRATELEIRA_ESP / 2, (zPrat0 + zPrat1) / 2)
-  prateleira.castShadow = true
-  scene.add(prateleira)
-  // mãos-francesas
-  for (const z of [zPrat0 - 0.1, (zPrat0 + zPrat1) / 2, zPrat1 + 0.1]) {
-    const sup = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.02, 0.02), matMetalFosco)
-    sup.position.set(-META_X + 0.11, ALTURA_PRATELEIRA - 0.02, z)
-    sup.rotation.z = -0.5
-    scene.add(sup)
+  // Módulo alto / geladeira no fim da composição.
+  const modulo = new THREE.Mesh(new THREE.BoxGeometry(MODULO_ALTO.largura, MODULO_ALTO.altura, MODULO_ALTO.profundidade), matArmario)
+  modulo.position.set(MODULO_ALTO.x, MODULO_ALTO.altura / 2, MODULO_ALTO.z)
+  modulo.castShadow = true
+  modulo.receiveShadow = true
+  scene.add(modulo)
+  const juntaModulo = new THREE.Mesh(new THREE.BoxGeometry(MODULO_ALTO.largura - 0.08, 0.018, 0.012), matRodape)
+  juntaModulo.position.set(MODULO_ALTO.x, 0.78, MODULO_ALTO.z + MODULO_ALTO.profundidade / 2 + 0.007)
+  scene.add(juntaModulo)
+  for (const y of [0.58, 1.36]) {
+    const puxador = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.38, 0.018), matMetalFosco)
+    puxador.position.set(MODULO_ALTO.x - 0.22, y, MODULO_ALTO.z + MODULO_ALTO.profundidade / 2 + 0.016)
+    scene.add(puxador)
   }
-  // prateleira a 1,5m não é obstáculo pro corpo: o jogador passa por baixo
+  obstaculos.push(caixa(MODULO_ALTO.x, MODULO_ALTO.z, MODULO_ALTO.largura, MODULO_ALTO.profundidade))
 
-  // ---------- mesa retangular ----------
-  // Planta do Diogo: mesa retangular no centro, não mais a ilha
-  // redonda. Pernas nos quatro cantos (recuadas 8cm da borda, como
-  // mesa de verdade) em vez de um pedestal só — o pedestal central
-  // fazia sentido pra ilha de bancada, não pra uma mesa de jantar.
-  const PERNA_ESP = 0.06
-  const PERNA_INSET = 0.08
-  const pernaAltura = MESA_ALTURA - MESA_TAMPO_ESP
-  const pernaGeom = new THREE.BoxGeometry(PERNA_ESP, pernaAltura, PERNA_ESP)
-  for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) {
-      const perna = new THREE.Mesh(pernaGeom, matArmario)
-      perna.position.set(
-        MESA_X + sx * (MESA_LARGURA / 2 - PERNA_INSET),
-        pernaAltura / 2,
-        MESA_Z + sz * (MESA_PROFUNDIDADE / 2 - PERNA_INSET),
-      )
-      perna.castShadow = true
+  // Primeiro sinal familiar: uma folha presa ao módulo, com marcas sem texto
+  // legível. Pode ser lista ou desenho; a cena não decide pelo visitante.
+  const matPapelFamilia = new THREE.MeshStandardMaterial({ map: TEX.papel(), color: 0xc8bda3, roughness: 0.96 })
+  const papelFamilia = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.28), matPapelFamilia)
+  papelFamilia.position.set(MODULO_ALTO.x + 0.13, 1.48, MODULO_ALTO.z + MODULO_ALTO.profundidade / 2 + 0.022)
+  papelFamilia.rotation.z = -0.055
+  scene.add(papelFamilia)
+  const matRiscoFamilia = new THREE.MeshStandardMaterial({ color: 0x6f746e, roughness: 1 })
+  for (let i = 0; i < 3; i++) {
+    const risco = new THREE.Mesh(new THREE.BoxGeometry(0.11 - i * 0.018, 0.006, 0.004), matRiscoFamilia)
+    risco.position.set(MODULO_ALTO.x + 0.13, 1.53 - i * 0.055, MODULO_ALTO.z + MODULO_ALTO.profundidade / 2 + 0.026)
+    risco.rotation.z = -0.055 + (i - 1) * 0.08
+    scene.add(risco)
+  }
+
+  // ---------- estante doméstica ----------
+  const matPrateleira = new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(1, 3), color: 0x6a5e4d, roughness: 0.84 })
+  const fundoEstante = new THREE.Mesh(new THREE.BoxGeometry(0.025, ESTANTE.altura, ESTANTE.profundidade), matPrateleira)
+  fundoEstante.position.set(-META_X + 0.025, ESTANTE.altura / 2, ESTANTE.z)
+  scene.add(fundoEstante)
+  for (const z of [ESTANTE.z - ESTANTE.profundidade / 2, ESTANTE.z + ESTANTE.profundidade / 2]) {
+    const lateral = new THREE.Mesh(new THREE.BoxGeometry(ESTANTE.largura, ESTANTE.altura, 0.045), matPrateleira)
+    lateral.position.set(ESTANTE.x, ESTANTE.altura / 2, z)
+    lateral.castShadow = true
+    scene.add(lateral)
+  }
+  const alturasEstante = [0.36, 0.76, 1.16, 1.56, 1.88]
+  for (const y of alturasEstante) {
+    const prateleira = new THREE.Mesh(new THREE.BoxGeometry(ESTANTE.largura, 0.04, ESTANTE.profundidade), matPrateleira)
+    prateleira.position.set(ESTANTE.x, y, ESTANTE.z)
+    prateleira.castShadow = true
+    scene.add(prateleira)
+  }
+  obstaculos.push(caixa(ESTANTE.x, ESTANTE.z, ESTANTE.largura, ESTANTE.profundidade))
+
+  // Poucas louças, repetidas. Dois espaços permanecem vazios e recebem só
+  // uma silhueta de poeira — o segundo sinal familiar da sala.
+  const matLouca = new THREE.MeshStandardMaterial({ color: 0xb7b1a3, roughness: 0.38 })
+  const matVidro = new THREE.MeshStandardMaterial({ color: 0xaebfc0, roughness: 0.2, transparent: true, opacity: 0.38 })
+  const adicionarRecipiente = (y, z, vidro = false) => {
+    const recipiente = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.052, 0.11, 16, 1, true), vidro ? matVidro : matLouca)
+    recipiente.position.set(-META_X + 0.21, y, z)
+    scene.add(recipiente)
+  }
+  adicionarRecipiente(0.435, 0.53)
+  adicionarRecipiente(0.435, 0.73)
+  adicionarRecipiente(0.845, -0.12, true)
+  adicionarRecipiente(1.245, -0.42, true)
+  const matPoeira = new THREE.MeshStandardMaterial({ color: 0x968d79, roughness: 1, transparent: true, opacity: 0.24 })
+  for (const [y, z] of [[0.382, -0.48], [1.182, 0.55]]) {
+    const vazio = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.13), matPoeira)
+    vazio.rotation.x = -Math.PI / 2
+    vazio.position.set(-META_X + 0.22, y, z)
+    scene.add(vazio)
+  }
+
+  // ---------- ilha e lugares à mesa ----------
+  const corpoIlha = new THREE.Mesh(new THREE.BoxGeometry(ILHA.largura - 0.12, ILHA.altura - 0.08, ILHA.profundidade - 0.1), matArmario)
+  corpoIlha.position.set(ILHA.x, (ILHA.altura - 0.08) / 2 + 0.08, ILHA.z)
+  corpoIlha.castShadow = true
+  corpoIlha.receiveShadow = true
+  scene.add(corpoIlha)
+  const tampoIlha = new THREE.Mesh(new THREE.BoxGeometry(ILHA.largura, TAMPO_ESP, ILHA.profundidade), matTampo)
+  tampoIlha.position.set(ILHA.x, ILHA.altura + TAMPO_ESP / 2, ILHA.z)
+  tampoIlha.castShadow = true
+  tampoIlha.receiveShadow = true
+  scene.add(tampoIlha)
+  obstaculos.push(caixa(ILHA.x, ILHA.z, ILHA.largura, ILHA.profundidade))
+
+  const matBanco = new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(), color: 0x5d5245, roughness: 0.86 })
+  for (const bancoPos of BANCOS) {
+    const assento = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.18, 0.045, 18), matBanco)
+    assento.position.set(bancoPos.x, 0.62, bancoPos.z)
+    assento.castShadow = true
+    scene.add(assento)
+    for (const [dx, dz] of [[-0.11, -0.08], [0.11, -0.08], [-0.11, 0.08], [0.11, 0.08]]) {
+      const perna = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.59, 8), matMetalFosco)
+      perna.position.set(bancoPos.x + dx, 0.305, bancoPos.z + dz)
       scene.add(perna)
     }
+    obstaculos.push(cilindro(bancoPos.x, bancoPos.z, 0.19))
   }
-  const mesaTampo = new THREE.Mesh(
-    new THREE.BoxGeometry(MESA_LARGURA, MESA_TAMPO_ESP, MESA_PROFUNDIDADE),
-    matTampo,
-  )
-  mesaTampo.position.set(MESA_X, MESA_ALTURA - MESA_TAMPO_ESP / 2, MESA_Z)
-  mesaTampo.castShadow = true
-  mesaTampo.receiveShadow = true
-  scene.add(mesaTampo)
-  // caixa, não cilindro — a colisão acompanha a forma real da mesa
-  // agora. Validado por simulação: ver comentário nas dimensões acima.
-  obstaculos.push(caixa(MESA_X, MESA_Z, MESA_LARGURA, MESA_PROFUNDIDADE))
 
-  // ---------- luminária pendente sobre a mesa ----------
+  // Terceiro sinal familiar: o terceiro lugar existe apenas como marca de uso.
+  const marcaLugar = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.012, 7, 28), matPoeira)
+  marcaLugar.rotation.x = Math.PI / 2
+  marcaLugar.position.set(LUGAR_AUSENTE.x, 0.008, LUGAR_AUSENTE.z)
+  marcaLugar.scale.y = 0.78
+  scene.add(marcaLugar)
+
+  // ---------- luminária pendente sobre a ilha ----------
   const matCupula = new THREE.MeshStandardMaterial({
     color: 0x2c2822,
     roughness: 0.6,
@@ -408,17 +383,17 @@ export function construirCozinha(scene) {
     side: THREE.DoubleSide,
   })
   const cupula = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.16, 24, 1, true), matCupula)
-  cupula.position.set(MESA_X, PE_DIREITO - 0.42, MESA_Z)
+  cupula.position.set(ILHA.x, PE_DIREITO - 0.42, ILHA.z)
   cupula.rotation.x = Math.PI
   scene.add(cupula)
   const haste = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.36, 6), matCupula)
-  haste.position.set(MESA_X, PE_DIREITO - 0.18, MESA_Z)
+  haste.position.set(ILHA.x, PE_DIREITO - 0.18, ILHA.z)
   scene.add(haste)
   const lampada = new THREE.Mesh(
     new THREE.SphereGeometry(0.035, 12, 10),
     new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffc477, emissiveIntensity: 2.4 }),
   )
-  lampada.position.set(MESA_X, PE_DIREITO - 0.47, MESA_Z)
+  lampada.position.set(ILHA.x, PE_DIREITO - 0.47, ILHA.z)
   scene.add(lampada)
 
   // ---------- iluminação ----------
@@ -434,8 +409,8 @@ export function construirCozinha(scene) {
   // fundo sem levantar o preto geral
   scene.add(new THREE.HemisphereLight(0x5b6472, 0x201a12, 0.35))
 
-  const pendente = new THREE.PointLight(0xffc98a, 9, 7.5, 2)
-  pendente.position.set(MESA_X, PE_DIREITO - 0.5, MESA_Z)
+  const pendente = new THREE.PointLight(0xffc98a, 9, 8.6, 2)
+  pendente.position.set(ILHA.x, PE_DIREITO - 0.5, ILHA.z)
   pendente.castShadow = true
   pendente.shadow.mapSize.set(1024, 1024)
   pendente.shadow.bias = -0.004
@@ -455,10 +430,9 @@ export function construirCozinha(scene) {
   // cone. Sem castShadow — a sombra que importa é a do pendente, e três
   // shadow maps extras num cômodo deste tamanho não pagam o custo.
   const apoios = [
-    { pos: [META_X - 0.42, 1.52, -META_Z + 0.95], alvo: [META_X - 0.32, ALTURA_TAMPO, -META_Z + 0.95], i: 4.2 },
-    { pos: [META_X - 0.42, 1.52, META_Z - 0.95], alvo: [META_X - 0.32, ALTURA_TAMPO, META_Z - 0.95], i: 3.6 },
-    { pos: [0.55, 1.52, -META_Z + 0.42], alvo: [0.55, ALTURA_TAMPO, -META_Z + 0.32], i: 3.0 },
-    { pos: [0.0, 1.52, META_Z - 0.42], alvo: [0.0, ALTURA_TAMPO, META_Z - 0.32], i: 2.6 },
+    { pos: [BANCADA_PIA.x, 1.54, -META_Z + 0.28], alvo: [BANCADA_PIA.x, ALTURA_TAMPO, BANCADA_PIA.z], i: 3.8 },
+    { pos: [BANCADA_APOIO.x, 1.54, -META_Z + 0.28], alvo: [BANCADA_APOIO.x, ALTURA_TAMPO, BANCADA_APOIO.z], i: 3.2 },
+    { pos: [META_X - 0.38, 1.54, BANCADA_FRIA.z], alvo: [BANCADA_FRIA.x, ALTURA_TAMPO, BANCADA_FRIA.z], i: 3.0 },
   ]
   for (const { pos, alvo, i } of apoios) {
     const l = new THREE.SpotLight(0xffdcae, i, 2.6, Math.PI / 2.6, 0.95, 2)
@@ -472,12 +446,12 @@ export function construirCozinha(scene) {
   // É a única pista de que existe algo além da Cozinha, e ela não
   // comenta nada — só é fria de um jeito que o resto do cômodo não é.
   const luzVao = new THREE.PointLight(0x8fa6c4, 1.7, 3.4, 2)
-  luzVao.position.set(PORTA_OFFSET_X, 1.85, -META_Z + 0.35)
+  luzVao.position.set(PORTA_OFFSET_X, 1.85, -META_Z + 0.38)
   scene.add(luzVao)
 
   // luz de apoio junto à estante, pra ela não virar um bloco preto
   const luzEstante = new THREE.PointLight(0xffd7a4, 0.9, 2.8, 2)
-  luzEstante.position.set(-META_X + 0.55, 1.35, 0)
+  luzEstante.position.set(-META_X + 0.62, 1.38, ESTANTE.z)
   scene.add(luzEstante)
 
   // ---------- porta ----------
@@ -495,30 +469,43 @@ export function construirCozinha(scene) {
   scene.add(portaGrupo)
   interativos.push(portaGrupo)
 
-  // Enquanto o Corredor não existe, o vão é intransponível. Este é o
-  // único obstáculo que sai daqui quando a transição entrar — deixado
-  // isolado e nomeado justamente pra ser fácil de achar depois.
+  // A troca de sala acontece pelo clique e pelo fade, não atravessando
+  // fisicamente a folha. O bloqueio fino impede o jogador de passar pelo
+  // vão enquanto mira a porta, sem ocupar a área de entrada da Cozinha.
   const bloqueioProvisorioDoVao = caixa(PORTA_OFFSET_X, -META_Z, LARGURA_PORTA, e)
   obstaculos.push(bloqueioProvisorioDoVao)
 
   // ---------- posições dos objetos ----------
-  const posBancada = distribuirGrupos(CAMINHO_BANCADA, GRUPOS_BANCADA)
-  const POSICOES = {}
-  for (const id in posBancada) {
-    POSICOES[id] = { x: posBancada[id].x, y: ALTURA_TAMPO, z: posBancada[id].z, rotY: posBancada[id].angulo }
+  // Posições explícitas aqui são deliberadas: cada objeto pertence a uma
+  // função espacial concreta, e mudar a arquitetura não deve redistribuí-los
+  // automaticamente para um trecho narrativamente incoerente.
+  const POSICOES = {
+    // preparo junto à pia
+    faca: { x: -0.58, y: ALTURA_TAMPO, z: BANCADA_PIA.z + 0.02, rotY: 0 },
+    tabua: { x: -0.3, y: ALTURA_TAMPO, z: BANCADA_PIA.z, rotY: 0 },
+    tesoura: { x: 0.01, y: ALTURA_TAMPO, z: BANCADA_PIA.z + 0.01, rotY: 0.12 },
+
+    // utensílios associados ao fogão que não está mais ali
+    amolador: { x: 1.02, y: ALTURA_TAMPO, z: BANCADA_APOIO.z, rotY: 0 },
+    espeto: { x: 1.34, y: ALTURA_TAMPO, z: BANCADA_APOIO.z, rotY: 0 },
+    panela: { x: 1.58, y: ALTURA_TAMPO, z: BANCADA_APOIO.z, rotY: 0 },
+    mancha: { x: VAO_FOGAO.x, y: 0.004, z: VAO_FOGAO.z + 0.01, rotY: 0.04 },
+
+    // ponto frio isolado no retorno lateral
+    gelo: { x: BANCADA_FRIA.x, y: ALTURA_TAMPO, z: BANCADA_FRIA.z, rotY: Math.PI / 2 },
+
+    // cotidiano interrompido sobre a ilha
+    garfo: { x: -0.73, y: ILHA.altura + TAMPO_ESP, z: -0.01, rotY: 0 },
+    pratovazio: { x: -0.35, y: ILHA.altura + TAMPO_ESP, z: -0.01, rotY: 0 },
+    toalha: { x: 0.08, y: ILHA.altura + TAMPO_ESP, z: 0.23, rotY: -0.08 },
+    copo: { x: 0.38, y: ILHA.altura + TAMPO_ESP, z: -0.11, rotY: 0 },
+
+    // registro doméstico guardado como se ainda tivesse uso
+    caderno: { x: -META_X + 0.23, y: 0.78, z: -0.52, rotY: Math.PI / 2 },
+    etiqueta: { x: -META_X + 0.23, y: 1.18, z: 0.08, rotY: Math.PI / 2 },
+    relogio: { x: -META_X + 0.23, y: 1.58, z: 0.5, rotY: Math.PI / 2 },
+    camera: { x: -META_X + 0.23, y: 1.58, z: -0.5, rotY: Math.PI / 2 },
   }
-
-  // estante: objetos de registro, virados pra dentro do cômodo
-  OBJETOS_PRATELEIRA.forEach((id, i) => {
-    const z = zPrat0 + ((zPrat1 - zPrat0) * i) / (OBJETOS_PRATELEIRA.length - 1)
-    POSICOES[id] = { x: -META_X + 0.15, y: ALTURA_APOIO_PRATELEIRA, z, rotY: Math.PI / 2 }
-  })
-
-  // ilha: o prato vazio, isolado no meio, "esperando algo que não veio"
-  POSICOES.pratovazio = { x: MESA_X, y: MESA_ALTURA, z: MESA_Z, rotY: 0 }
-
-  // chão: único objeto que a fala não amarra a nenhuma superfície
-  POSICOES.mancha = { x: -1.15, y: 0.002, z: 0.55, rotY: 0.3 }
 
   objetos.forEach((o) => {
     const p = POSICOES[o.id]
@@ -540,11 +527,11 @@ export function construirCozinha(scene) {
     porta,
     obstaculos,
     interativos,
-    // spawn: canto sudoeste, longe da porta e da bancada, de frente pro cômodo
-    spawn: { x: -META_X + 0.75, y: 1.65, z: META_Z - 0.75, olharY: -0.75 },
+    // spawn: setor sudoeste, com visão diagonal da ilha e da parede principal
+    spawn: { x: -1.85, y: 1.65, z: 1.38, olharY: -0.7 },
     // O zumbido parece vir de dentro da parede leste, perto do trecho
     // anormalmente frio da bancada. A fonte fica além da face visível.
-    fonteSom: { x: META_X + 0.18, y: 0.48, z: META_Z - 0.62 },
+    fonteSom: { x: META_X + 0.18, y: 0.48, z: BANCADA_FRIA.z },
     limites: { peDireito: PE_DIREITO },
   }
 }

@@ -902,3 +902,51 @@ várias trocas e os fluxos completos de porta → Sala Final → dossiê e final
 apressado. O navegador automatizado preservou o Pointer Lock no salto testado,
 mas emitiu avisos internos inconsistentes da API do Chromium, então essa parte
 não foi considerada validação manual definitiva.
+
+### 17/08/2026 — Sessão 25 (Cozinha — memória doméstica e ausência)
+
+A Cozinha foi ampliada e reorganizada sem alterar seu contrato com o motor,
+os 16 objetos, clusters, reações ou Vestígios Narrativos. A direção deixou de
+ser uma bancada contínua com mesa central e passou a sugerir uma casa cuja vida
+cotidiana foi desaparecendo aos poucos.
+
+- **Nova planta** (`cozinha.js`): o cômodo cresceu de 4,28 × 3,28 m para
+  aproximadamente 5,4 × 4,2 m, preservando o pé-direito de 2,70 m. Porta e
+  spawn continuam no setor oeste, com visão diagonal da ilha e um percurso
+  inicial livre.
+- **Parede principal interrompida:** pia e bancada de preparo são seguidas por
+  um vão de fogão ausente, um segundo apoio e um módulo alto semelhante a
+  geladeira/torre. O vazio possui diferença discreta de parede, marca no piso,
+  pontos de instalação e a mancha interativa, sem texto que explique a remoção.
+- **Ilha e lateral doméstica:** a ilha voltou a ter altura de bancada e recebeu
+  prato, garfo, toalha e copo. Dois bancos ocupam um lado; uma marca de uso
+  sugere um terceiro lugar ausente. A parede oeste ganhou estante aberta com
+  poucas louças, espaços vazios e os objetos de registro/observação.
+- **Sinais familiares:** uma folha sem texto legível presa ao módulo alto,
+  dois nichos marcados apenas por poeira e o lugar ausente na ilha. Nenhum
+  desses elementos é coletável ou explica a narrativa.
+- **Redistribuição dos 16 objetos:** faca, tábua e tesoura ficam junto à pia;
+  amolador, espeto e panela cercam o vão; a mancha ocupa o piso do fogão
+  ausente; o gelo permanece isolado numa bancada lateral; quatro objetos
+  domésticos ficam na ilha; caderno, etiqueta, relógio e câmera ocupam a
+  estante, com a câmera voltada para o interior da sala.
+- **Colisões mais fiéis:** cada trecho de bancada possui sua própria caixa,
+  deixando o vão realmente livre. Ilha, módulo alto e estante usam a projeção
+  de seus móveis, enquanto os bancos usam colisores cilíndricos pequenos. Não
+  foi criada física nova nem alterado o resolvedor compartilhado.
+- **Navegação:** uma simulação em grade de 5 cm com `resolverMovimento()`
+  confirmou uma única região navegável, incluindo porta, vão do fogão, quatro
+  lados da ilha, bancada fria e estante.
+
+**Validação realizada:** `node --check` em todos os JavaScripts; imports locais,
+HTML e `git diff --check`; cobertura dos 16 IDs em dados, posições, modelos,
+reações e Vestígios; raycast real em Three.js para os 16 alvos; rotas A–D e
+final apressado; carregamento WebGL normal; alternância repetida entre Cozinha,
+Corredor, Ambientes A–D e Sala Final pelo modo apresentação; URL normal sem
+atalhos extras; console sem erros ou avisos durante esses fluxos.
+
+**Teste manual restante:** percorrer a planta com Pointer Lock real, confirmar
+o conforto atrás dos bancos e junto ao vão, avaliar alcance/contorno dos 16
+objetos durante movimento livre e calibrar visualmente a leitura da mancha,
+dos nichos vazios e da estante nas resoluções usadas na apresentação. O
+navegador automatizado não concedeu Pointer Lock nesta sessão.
