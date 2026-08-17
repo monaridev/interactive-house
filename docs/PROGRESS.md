@@ -950,3 +950,51 @@ o conforto atrás dos bancos e junto ao vão, avaliar alcance/contorno dos 16
 objetos durante movimento livre e calibrar visualmente a leitura da mancha,
 dos nichos vazios e da estante nas resoluções usadas na apresentação. O
 navegador automatizado não concedeu Pointer Lock nesta sessão.
+
+### 17/08/2026 — Sessão 26 (Diário de Bordo na Sala Final)
+
+A Sala Final recebeu uma descoberta documental opcional sem alterar o fluxo
+principal do dossiê. O arquivo sobre a mesa continua registrando o visitante;
+o novo Diário de Bordo, encontrado numa estante secundária, registra a história
+de desenvolvimento de A Casa.
+
+- **Estante e livro físico** (`sala-final.js`): a estante compacta do fundo
+  esquerdo foi aberta visualmente e recebeu quatro volumes neutros e um Diário
+  procedural com capa, páginas, lombada e título gerado por canvas. O livro fica
+  levemente inclinado e avançado. O colisor existente permanece fiel ao volume
+  completo do móvel e não invade o percurso até a mesa.
+- **Indicação discreta:** o Diário participa do mesmo raycast e `OutlinePass`
+  usados pelos outros interativos quando está sob a mira. Fora do hover, somente
+  a capa recebe uma oscilação emissiva lenta e muito fraca, sem marcador,
+  tooltip permanente ou contorno concorrente com o dossiê.
+- **Leitor isolado** (`diario.js` + `index.html`): a leitura usa um overlay
+  próprio em forma de livro aberto, com duas páginas lado a lado, quatro
+  aberturas, controles de voltar/folhear/fechar e fechamento por `Escape`. O
+  módulo instala os listeners uma única vez no carregamento e não depende de
+  `Estado`, rotas, clusters ou Vestígios Narrativos.
+- **Cronologia registrada:** abril começa pelo sistema de agendamento de salas
+  e segue para o chatbot; maio introduz A Casa; junho registra o primeiro
+  protótipo; julho apresenta O Museu como experimento paralelo já
+  descontinuado; agosto reúne a evolução tridimensional, as rotas, a narrativa
+  reativa, os Vestígios e a nova Cozinha. A última entrada mantém isolada a
+  frase de 17/08/2026 sobre as ausências.
+- **Integração com o motor** (`main.js`): o novo tipo `diario` pausa movimento,
+  limpa HUD/contorno, libera Pointer Lock e tenta retomá-lo ao fechar, com a capa
+  de entrada disponível como recuperação. O dossiê conserva seu overlay,
+  conteúdo, estado e encerramento próprios. O modo apresentação continua
+  chegando à Sala Final pela tecla `7`, sem novo atalho obrigatório.
+
+**Validação realizada:** `node --check` em todos os JavaScripts; imports locais,
+HTML, cronologia obrigatória e `git diff --check`; carregamento WebGL da Sala
+Final; estante e livro renderizados; raycast atingindo o grupo `diario`; quatro
+aberturas, navegação anterior/próxima, botão fechar e `Escape`; dossiê aberto
+antes e depois do Diário; snapshot de estado idêntico antes/depois da leitura;
+trocas repetidas entre as sete salas pelo modo apresentação; URL normal sem
+atalhos/indicador e console limpo nesses fluxos. O harness temporário usado para
+os testes foi removido.
+
+**Validação manual restante:** conferir no navegador da apresentação o alcance
+do hover em movimento livre, a calibração final do brilho e da tipografia nas
+resoluções reais, a colisão ao se aproximar da estante e a sequência completa
+de liberar/retomar Pointer Lock. O navegador automatizado não concedeu Pointer
+Lock real; a capa de recuperação foi mantida para esse caso.

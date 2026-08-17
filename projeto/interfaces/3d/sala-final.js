@@ -21,6 +21,50 @@ function mesh(geometria, material, x, y, z, rx = 0, ry = 0, rz = 0) {
   return objeto
 }
 
+function texturaTituloDiario() {
+  const canvas = document.createElement("canvas")
+  canvas.width = 256
+  canvas.height = 512
+  const ctx = canvas.getContext("2d")
+  ctx.fillStyle = "#49352e"
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.strokeStyle = "rgba(205, 187, 146, .58)"
+  ctx.lineWidth = 4
+  ctx.strokeRect(14, 14, canvas.width - 28, canvas.height - 28)
+  ctx.fillStyle = "#d0bd91"
+  ctx.textAlign = "center"
+  ctx.font = "bold 31px Georgia, serif"
+  ctx.fillText("DIÁRIO", 128, 176)
+  ctx.fillText("DE BORDO", 128, 218)
+  ctx.font = "22px Georgia, serif"
+  ctx.fillText("A CASA", 128, 280)
+  ctx.font = "19px Georgia, serif"
+  ctx.fillText("2026", 128, 326)
+  const textura = new THREE.CanvasTexture(canvas)
+  textura.colorSpace = THREE.SRGBColorSpace
+  return textura
+}
+
+function criarDiarioFisico() {
+  const grupo = new THREE.Group()
+  const capa = new THREE.MeshStandardMaterial({
+    color: 0x49352e,
+    emissive: 0x6a4c37,
+    emissiveIntensity: 0.035,
+    roughness: 0.84,
+  })
+  const paginas = new THREE.MeshStandardMaterial({ color: 0xc3b99e, roughness: 0.94 })
+  const titulo = new THREE.MeshBasicMaterial({ map: texturaTituloDiario(), transparent: false })
+
+  grupo.add(mesh(new THREE.BoxGeometry(0.24, 0.36, 0.025), capa, 0, 0, -0.025))
+  grupo.add(mesh(new THREE.BoxGeometry(0.22, 0.325, 0.045), paginas, 0.005, -0.002, 0))
+  grupo.add(mesh(new THREE.BoxGeometry(0.24, 0.36, 0.025), capa, 0, 0, 0.025))
+  grupo.add(mesh(new THREE.BoxGeometry(0.035, 0.36, 0.07), capa, -0.11, 0, 0))
+  grupo.add(mesh(new THREE.PlaneGeometry(0.18, 0.3), titulo, 0.008, 0, 0.039))
+
+  return { grupo, materialCapa: capa }
+}
+
 function criarDossie(materiais, vestigios, rota) {
   const grupo = new THREE.Group()
   const { pasta, papel, tinta, metal } = materiais
@@ -67,6 +111,7 @@ export function construirSalaFinal(scene, ctx = {}) {
   const data = DATA.salas.salaFinal
   const vestigios = ctx.vestigios
   const refDossie = data.objetos.find((objeto) => objeto.id === "dossie")
+  const refDiario = { id: "diario", nome: "Diário de Bordo", fala: "Folhear o registro" }
   const obstaculos = []
   const interativos = []
   const mx = LARGURA / 2
@@ -117,16 +162,35 @@ export function construirSalaFinal(scene, ctx = {}) {
   }
   obstaculos.push(caixa(-0.42, 1.02, 0.62, 0.62))
 
-  // Armário baixo e estante compacta ao fundo: suficientes para sugerir
-  // rotina administrativa, sem repetir o corredor de arquivos da Sala D.
+  // Armário baixo e estante compacta ao fundo: uma descoberta secundária,
+  // fora do eixo mesa–dossiê e sem repetir o corredor de arquivos da Sala D.
   scene.add(mesh(new THREE.BoxGeometry(1.15, 0.78, 0.38), metal, -1.63, 0.39, -1.82))
-  scene.add(mesh(new THREE.BoxGeometry(1.12, 1.12, 0.34), metalEscuro, -1.63, 1.42, -1.84))
-  for (const y of [0.96, 1.34, 1.72]) {
+  scene.add(mesh(new THREE.BoxGeometry(1.12, 1.12, 0.055), metalEscuro, -1.63, 1.42, -1.98))
+  for (const x of [-2.16, -1.1]) {
+    scene.add(mesh(new THREE.BoxGeometry(0.06, 1.12, 0.34), metalEscuro, x, 1.42, -1.84))
+  }
+  for (const y of [0.88, 1.24, 1.6, 1.98]) {
     scene.add(mesh(new THREE.BoxGeometry(1.03, 0.028, 0.31), metal, -1.63, y, -1.67))
   }
-  for (let i = 0; i < 8; i++) {
-    scene.add(mesh(new THREE.BoxGeometry(0.075, 0.3, 0.24), pasta, -2.0 + (i % 4) * 0.22, 1.11 + Math.floor(i / 4) * 0.39, -1.63, 0, 0, (i % 3 - 1) * 0.025))
+  const volumes = [
+    { x: -2, y: 1.055, h: 0.31, cor: 0x75684f, inclinacao: 0.015 },
+    { x: -1.89, y: 1.045, h: 0.29, cor: 0x5f665f, inclinacao: -0.035 },
+    { x: -1.28, y: 1.415, h: 0.32, cor: 0x6d5b48, inclinacao: 0.025 },
+    { x: -1.17, y: 1.405, h: 0.3, cor: 0x5c5548, inclinacao: -0.02 },
+  ]
+  for (const volume of volumes) {
+    const materialVolume = new THREE.MeshStandardMaterial({ color: volume.cor, roughness: 0.91 })
+    scene.add(mesh(new THREE.BoxGeometry(0.085, volume.h, 0.24), materialVolume, volume.x, volume.y, -1.63, 0, 0, volume.inclinacao))
   }
+
+  const { grupo: diario, materialCapa: materialDiario } = criarDiarioFisico()
+  diario.position.set(-1.7, 1.43, -1.61)
+  diario.rotation.z = -0.075
+  diario.rotation.y = -0.035
+  diario.userData = { tipo: "diario", ref: refDiario }
+  scene.add(diario)
+  interativos.push(diario)
+  let tempoDiario = 0
   obstaculos.push(caixa(-1.63, -1.82, 1.2, 0.42))
 
   // Porta fechada e quadro de protocolo: elementos estáticos, sem competir
@@ -142,7 +206,7 @@ export function construirSalaFinal(scene, ctx = {}) {
     scene.add(mesh(new THREE.BoxGeometry(0.006, 0.012, 0.7 - i * 0.07), tinta, mx - 0.124, 1.68 - i * 0.09, -0.55))
   }
 
-  // O único objeto interativo.
+  // O dossiê continua sendo o alvo principal no centro da composição.
   const dossie = criarDossie({ pasta, papel, tinta, metal }, vestigios, ctx.rotaFinalId)
   dossie.position.set(0.08, mesaA + 0.055, -0.02)
   dossie.rotation.y = intensidade(vestigios, "ordem") >= 3 ? -0.08 : -0.16
@@ -178,5 +242,9 @@ export function construirSalaFinal(scene, ctx = {}) {
     spawn: { x: 0.92, y: 1.65, z: 1.78, olharY: 0.42 },
     fonteSom: { x: -0.2, y: 2.56, z: 0.18 },
     limites: { peDireito: PE_DIREITO },
+    atualizar(delta) {
+      tempoDiario += delta
+      materialDiario.emissiveIntensity = 0.035 + (Math.sin(tempoDiario * 1.45) + 1) * 0.022
+    },
   }
 }

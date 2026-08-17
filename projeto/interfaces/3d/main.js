@@ -26,6 +26,7 @@ import { construirSalaB } from "./sala-b.js"
 import { construirSalaC } from "./sala-c.js"
 import { construirSalaD } from "./sala-d.js"
 import { construirSalaFinal } from "./sala-final.js"
+import { criarLeitorDiario } from "./diario.js"
 import { criarSistemaReacoes } from "./reacoes.js"
 import { resolverMovimento, desencaixar } from "./colisao.js"
 import { variacaoDossie } from "./vestigios.js"
@@ -301,6 +302,7 @@ capa.addEventListener("click", iniciarAudio)
 // diferença é só COMO aparece: aqui é um overlay de papel por cima do
 // canvas 3D, em vez de trocar o conteúdo da página inteira.
 const overlayRelatorio = document.getElementById("relatorio-overlay")
+const overlayDiario = document.getElementById("diario-overlay")
 const CLUSTER_LABEL = { corte: "Corte", domestico: "Doméstico", vazio: "Vazio", registro: "Registro" }
 const REGISTRO_ID = { salaA: "41-A", salaB: "41-B", salaC: "41-C", salaD: "41-D" }
 const SALAS_DESFECHO = new Set(["salaA", "salaB", "salaC", "salaD"])
@@ -501,6 +503,32 @@ function fecharDossie() {
   controls.lock()
 }
 
+// ---------- Diário de Bordo da Sala Final ----------
+// A leitura vive num overlay próprio e não consulta nem altera Estado. O
+// motor coordena somente a pausa/retomada da navegação, como já faz com o
+// dossiê; conteúdo e paginação ficam isolados em diario.js.
+const leitorDiario = criarLeitorDiario({
+  overlay: overlayDiario,
+  aoFechar() {
+    leituraAberta = false
+    Object.keys(teclas).forEach((k) => (teclas[k] = false))
+    capa.classList.remove("oculto")
+    controls.lock()
+  },
+})
+
+function abrirDiario() {
+  if (leituraAberta) return
+  leituraAberta = true
+  Object.keys(teclas).forEach((k) => (teclas[k] = false))
+  outlinePass.selectedObjects = []
+  clearTimeout(temporizadorHud)
+  hud.classList.remove("visivel")
+  controls.unlock()
+  capa.classList.add("oculto")
+  leitorDiario.abrir()
+}
+
 function encerrarLevantamento() {
   const papel = overlayRelatorio.querySelector(".dossie-papel")
   papel?.classList.remove("aberto")
@@ -585,6 +613,7 @@ function atualizarContorno() {
   if (alvo !== ultimoAlvoHover) {
     ultimoAlvoHover = alvo
     if (alvo?.userData?.tipo === "dossie") escrever(alvo.userData.ref.nome.toUpperCase(), alvo.userData.ref.fala)
+    if (alvo?.userData?.tipo === "diario") escrever(alvo.userData.ref.nome.toUpperCase(), alvo.userData.ref.fala)
   }
 }
 
@@ -646,6 +675,11 @@ renderer.domElement.addEventListener("click", () => {
 
   if (tipo === "dossie") {
     abrirDossie()
+    return
+  }
+
+  if (tipo === "diario") {
+    abrirDiario()
     return
   }
 
@@ -782,6 +816,7 @@ if (new URLSearchParams(location.search).has("inspecao")) {
       rotaFinalId = id
     },
     abrirDossie,
+    abrirDiario,
     olhar(de, para) {
       camera.position.set(de[0], de[1], de[2])
       camera.lookAt(para[0], para[1], para[2])
@@ -810,6 +845,7 @@ function animar() {
     atualizarContorno()
   }
   reacoes.atualizar(delta)
+  sala.atualizar?.(delta)
   atualizarOuvinte()
   composer.render()
 }

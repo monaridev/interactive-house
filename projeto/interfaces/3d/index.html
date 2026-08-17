@@ -341,6 +341,113 @@
     .encerramento-final { animation-duration: .01ms; animation-delay: 0s; }
     canvas.tremor-leve, canvas.tremor-corte { animation: none; }
   }
+
+  /* Diário de Bordo: camada independente do relatório. A abertura usa duas
+     folhas reais lado a lado; não compartilha DOM, classes nem estado com o
+     dossiê, que continua sendo o documento principal da Sala Final. */
+  #diario-overlay {
+    position: fixed; inset: 0; z-index: 21;
+    display: flex; align-items: center; justify-content: center;
+    box-sizing: border-box; padding: clamp(14px, 3vw, 36px);
+    background: rgba(4, 4, 5, .76); backdrop-filter: blur(3px) saturate(.68);
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .32s ease, visibility 0s linear .32s;
+  }
+  #diario-overlay.visivel {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    transition: opacity .32s ease;
+  }
+  .diario-livro {
+    --diario-papel: #c8bea3; --diario-papel-claro: #d4cab0;
+    --diario-tinta: #302a21; --diario-fraca: #716754; --diario-capa: #42342e;
+    position: relative; width: min(1040px, 94vw); height: min(78vh, 700px);
+    min-height: 470px; display: grid; grid-template-rows: 1fr auto;
+    box-shadow: 0 34px 100px rgba(0,0,0,.82), 0 8px 22px rgba(0,0,0,.58);
+    opacity: 0; transform: translateY(12px) scale(.988);
+    transition: opacity .28s ease, transform .28s ease;
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  }
+  .diario-livro.aberto { opacity: 1; transform: none; }
+  .diario-abertura {
+    position: relative; min-height: 0; display: grid; grid-template-columns: 1fr 1fr;
+    background: var(--diario-capa); padding: 10px 11px 7px;
+  }
+  .diario-abertura::after {
+    content: ""; position: absolute; z-index: 2; top: 10px; bottom: 7px; left: 50%;
+    width: 34px; transform: translateX(-50%); pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(48,38,29,.22) 38%, rgba(255,255,255,.09) 51%, rgba(48,38,29,.24) 65%, transparent);
+  }
+  .diario-pagina {
+    position: relative; min-width: 0; overflow: auto; box-sizing: border-box;
+    padding: clamp(32px, 4vw, 54px) clamp(28px, 4vw, 58px) 42px;
+    color: var(--diario-tinta); scrollbar-color: #857962 transparent;
+    background-color: var(--diario-papel);
+    background-image:
+      radial-gradient(circle at 16% 12%, #715f3f16 0 1px, transparent 2px),
+      radial-gradient(circle at 78% 76%, #62523812 0 1px, transparent 2px),
+      repeating-linear-gradient(0deg, transparent 0 3px, #2b241807 3px 4px),
+      linear-gradient(96deg, #78684910, transparent 14%, #fff2 52%, transparent 88%);
+    border: 1px solid #91866e; box-shadow: inset 0 0 46px rgba(91,73,43,.13);
+  }
+  .diario-pagina:first-child { border-right: 0; border-radius: 3px 0 0 2px; }
+  .diario-pagina:nth-child(2) { border-left: 0; border-radius: 0 3px 2px 0; }
+  .diario-pagina header { min-height: 76px; padding-bottom: 15px; border-bottom: 1px solid rgba(91,80,61,.42); }
+  .diario-pagina header span {
+    display: block; margin-bottom: 7px; color: var(--diario-fraca);
+    font: 10px/1.4 "Courier New", ui-monospace, monospace; letter-spacing: .11em; text-transform: uppercase;
+  }
+  .diario-pagina h2 { margin: 0; font-size: clamp(19px, 2vw, 26px); line-height: 1.15; font-weight: 600; }
+  .diario-texto { padding-top: clamp(18px, 2.5vh, 28px); }
+  .diario-texto p { margin: 0 0 1em; font-size: clamp(13px, 1.25vw, 15px); line-height: 1.62; }
+  .diario-texto blockquote {
+    margin: 24px 0 0; padding: 14px 0 2px 18px;
+    border-left: 2px solid rgba(102,73,53,.58); color: #4a392d;
+    font-size: clamp(14px, 1.35vw, 17px); line-height: 1.55; font-style: italic;
+  }
+  .diario-pagina > small {
+    position: absolute; bottom: 17px; left: 50%; transform: translateX(-50%);
+    color: var(--diario-fraca); font: 9px/1 "Courier New", ui-monospace, monospace; letter-spacing: .12em;
+  }
+  .diario-pagina-final { display: flex; flex-direction: column; justify-content: center; }
+  .diario-pagina-final header { min-height: 0; border: 0; text-align: center; }
+  .diario-pagina-final .diario-texto { padding: 0; }
+  .diario-pagina-final blockquote {
+    max-width: 28ch; margin: 48px auto 0; padding: 0; border: 0;
+    text-align: center; font-size: clamp(18px, 2vw, 25px); line-height: 1.55;
+  }
+  .diario-navegacao {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+    min-height: 48px; padding: 0 18px; color: #d0c1a0; background: var(--diario-capa);
+    border-top: 1px solid rgba(208,193,160,.2);
+    font: 10px/1 "Courier New", ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .diario-navegacao button, .diario-fechar {
+    all: unset; cursor: pointer; color: #c4b494; padding: 10px;
+  }
+  .diario-navegacao button:first-child { justify-self: start; }
+  .diario-navegacao button:last-child { justify-self: end; }
+  .diario-navegacao button:hover, .diario-navegacao button:focus-visible,
+  .diario-fechar:hover, .diario-fechar:focus-visible { color: #f0e2c0; text-decoration: underline; }
+  .diario-navegacao button:disabled { cursor: default; opacity: .24; text-decoration: none; }
+  .diario-fechar {
+    position: absolute; z-index: 4; right: 20px; top: -34px;
+    font: 10px/1 "Courier New", ui-monospace, monospace; letter-spacing: .11em; text-transform: uppercase;
+  }
+  @media (max-width: 760px) {
+    .diario-livro { height: 86vh; min-height: 380px; }
+    .diario-pagina { padding: 28px 20px 38px; }
+    .diario-pagina header { min-height: 70px; }
+    .diario-texto p { font-size: 12px; line-height: 1.52; }
+  }
+  @media (max-width: 560px) {
+    .diario-abertura { grid-template-columns: 1fr; overflow-y: auto; }
+    .diario-abertura::after { display: none; }
+    .diario-pagina { overflow: visible; min-height: 70vh; }
+    .diario-pagina:first-child, .diario-pagina:nth-child(2) { border: 1px solid #91866e; border-radius: 2px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #diario-overlay, .diario-livro { transition: none; }
+  }
 </style>
 
 <!--
@@ -377,6 +484,7 @@
   <div id="efeito-reacao" aria-hidden="true"></div>
   <div id="transicao"></div>
   <div id="relatorio-overlay" role="region" aria-label="Encerramento do levantamento" aria-hidden="true"></div>
+  <div id="diario-overlay" role="dialog" aria-modal="true" aria-label="Diário de Bordo" aria-hidden="true"></div>
 
   <script src="../../core/dados.js"></script>
   <script src="../../core/estado.js"></script>
