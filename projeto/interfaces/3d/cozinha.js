@@ -481,11 +481,16 @@ export function construirCozinha(scene) {
   scene.add(luzEstante)
 
   // ---------- porta ----------
-  const portaGrupo = criarPorta(LARGURA_PORTA - 0.06, ALTURA_PORTA - 0.04)
-  // dobradiça na borda esquerda do vão, não no centro — porta gira em
-  // torno do batente, como porta de verdade
-  portaGrupo.position.set(bordaEsqPorta + 0.03, 0, -META_Z - e / 2)
-  portaGrupo.rotation.y = 0.42 // entreaberta, como no texto da versão 2D
+  const larguraFolha = LARGURA_PORTA - 0.06
+  const portaFolha = criarPorta(larguraFolha, ALTURA_PORTA - 0.04)
+  const portaGrupo = new THREE.Group()
+  // criarPorta nasce centralizada; deslocar a folha deixa a origem do grupo
+  // exatamente na dobradiça. A abertura negativa traz a porta para dentro da
+  // Cozinha e o pequeno recuo elimina o contato com a espessura da parede.
+  portaFolha.position.x = larguraFolha / 2
+  portaGrupo.add(portaFolha)
+  portaGrupo.position.set(bordaEsqPorta + 0.03, 0, -META_Z + 0.025)
+  portaGrupo.rotation.y = -0.34
   portaGrupo.userData = { tipo: "porta", ref: porta }
   scene.add(portaGrupo)
   interativos.push(portaGrupo)

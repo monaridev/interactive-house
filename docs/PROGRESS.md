@@ -727,3 +727,148 @@ apressado (loop cozinha↔corredor sem clicar em nada).
 (especialmente o `unlock()` do ponteiro e a transição do overlay). Se
 aprovado, seguir para o Ambiente B — com a permissão dele, combinada nesta
 sessão.
+
+### 16/08/2026 — Sessão 20 (Ambientes B, C e D + integração completa)
+
+As três rotas que ainda terminavam numa porta bloqueada foram implementadas
+em Three.js, reutilizando integralmente os textos e a lógica de
+`core/dados.js`.
+
+- **Ambiente B — Doméstico** (`sala-b.js`, novo): sala de jantar própria,
+  com mesa posta, toalha excessivamente esticada, cadeira virada de costas e
+  copo invertido. Os quatro elementos são interativos e usam as falas já
+  existentes. Inclui colisões da mesa/cadeira, iluminação quente concentrada,
+  porta final e fonte de áudio espacial.
+- **Ambiente C — Vazio** (`sala-c.js`, novo): cômodo frio com placas de piso
+  discretamente desalinhadas, mancha vertical, partículas que materializam o
+  alvo narrativo “Ar”, condensação no teto e área fria no chão. Mantém o
+  corredor de navegação livre, iluminação fria, porta final e fonte sonora.
+- **Ambiente D — Registro** (`sala-d.js`, novo): corredor de arquivo com
+  estantes nas duas paredes, pastas e etiquetas sem correspondência, ficha em
+  bandeja e selo sobre gaveta. Usa geometrias/materiais compartilhados dentro
+  do módulo para evitar custo desnecessário. Inclui colisões, luzes de arquivo,
+  porta final e fonte sonora.
+- **Integração** (`main.js`): importados e registrados `salaB`, `salaC` e
+  `salaD` em `SALAS_3D`. Todas as portas finais continuam apontando para o
+  relatório já existente, que usa `sala.id` para selecionar o texto e o
+  cluster corretos na catalogação.
+- **Correção localizada no Corredor** (`main.js`): o clique em porta agora
+  calcula o destino a partir do `ref` da porta efetivamente atingida pelo
+  raycast. Antes, as duas portas do Corredor usavam sempre `sala.porta`, então
+  a porta visual de retorno não respeitava seu `proxima: "cozinha"`.
+
+**Validação realizada:**
+- `node --check` em todos os arquivos JavaScript de `core`, terminal e 3D;
+- `git diff --check` sem problemas de whitespace;
+- servidor estático respondeu HTTP 200 para o HTML, motor, dados e os seis
+  módulos de ambiente;
+- verificação de todos os imports locais;
+- simulação da decisão de rota confirmou corte → `salaA`, doméstico →
+  `salaB`, vazio → `salaC` e registro → `salaD`;
+- conferidos relatório e comportamento específicos para os quatro clusters;
+- final apressado confirmado após a terceira visita ao Corredor sem cliques.
+
+**Limitação restante:** não houve validação visual/WebGL nesta sessão porque o
+ambiente disponível não possui binário de navegador instalado. O servidor
+estático foi iniciado, mas a inspeção final de enquadramento, iluminação,
+alcance dos quatro objetos e conforto de navegação em B/C/D deve ser feita no
+navegador da apresentação.
+
+### 16/08/2026 — Sessão 21 (Sala Final 3D + dossiê imersivo)
+
+O encerramento principal deixou de trocar imediatamente o canvas por uma tela
+2D opaca. As quatro rotas agora entram numa única Sala Final 3D e o relatório é
+consultado fisicamente num dossiê sobre a mesa.
+
+- **Sala Final** (`sala-final.js`, novo): ambiente institucional pequeno com
+  mesa central, cadeira, armário/estante compacta, porta fechada, quadro de
+  protocolo e iluminação envelhecida. O dossiê é o único objeto interativo e
+  usa o raycast e o `OutlinePass` já existentes. A sala possui colisores,
+  `spawn`, fonte de som e o mesmo contrato dos outros ambientes.
+- **Dados** (`core/dados.js`): incluído apenas o descritor da `salaFinal` e do
+  objeto `dossie`. Os relatórios e comportamentos existentes não foram
+  reescritos.
+- **Fluxo A/B/C/D** (`main.js`): ao receber o destino compartilhado
+  `relatorio`, o motor guarda a sala de origem e transita para `salaFinal`.
+  `dados.js` continua usando `relatorio` nas portas para preservar a versão
+  terminal/2D; a transformação para Sala Final existe somente no motor 3D.
+- **Dossiê de duas páginas** (`main.js` + `index.html`): Página 1 apresenta
+  número do registro, cluster, quantidade de objetos analisados e o texto de
+  `DATA.relatorios`; Página 2 mostra classificação, interpretação e observação
+  final derivadas de `DATA.comportamentos`. Há controles diretos para próxima
+  página, voltar, fechar o arquivo e encerrar o levantamento.
+- **Pointer Lock/HUD**: abrir o dossiê limpa teclas pressionadas, remove o
+  contorno, esconde o HUD, libera o mouse e mantém a capa inicial oculta para o
+  cenário continuar visível. Fechar tenta retomar o Pointer Lock e reapresenta
+  a capa como recuperação caso o navegador negue a retomada.
+- **Encerramento**: o documento desaparece, o fundo faz fade para preto e usa
+  as mensagens existentes “Catalogação finalizada” e “Registro encerrado”.
+- **Fallback preservado**: `mostrarRelatorio`, `mostrarCatalogacaoFinal` e
+  `encerrarExperiencia` continuam no código. O final apressado permanece usando
+  esse caminho e não depende da Sala Final.
+- **Iluminação**: Sala B recebeu pequeno aumento de ambiente, hemisférica,
+  pendente e luz da porta. Sala C recebeu materiais mais legíveis, ambiente
+  frio reforçado e um segundo preenchimento lateral, mantendo a paleta azulada.
+
+**Validação realizada:**
+- `node --check` em todos os JavaScripts de `core`, terminal e 3D;
+- `git diff --check` e parsing do HTML sem erros;
+- imports locais e registro de `salaFinal` conferidos;
+- simulação de dados confirmou conteúdo distinto para A/corte, B/doméstico,
+  C/vazio e D/registro;
+- referências e listeners de próxima página, voltar, fechar e encerrar
+  conferidos;
+- preservação do final apressado confirmada;
+- servidor estático respondeu HTTP 200 para HTML, motor, dados e módulos das
+  salas alteradas.
+
+**Limitação restante:** não foi realizado teste visual/WebGL ou de Pointer
+Lock real porque o ambiente não possui navegador executável. Iluminação,
+enquadramento do spawn, alcance do dossiê, colisões e legibilidade responsiva
+das páginas ainda precisam de validação manual no navegador da apresentação.
+
+### 16/08/2026 — Sessão 22 (polimento visual final)
+
+- **Sala C:** materiais de piso e paredes ficaram moderadamente mais claros;
+  luz ambiente/hemisférica e os três pontos existentes foram reajustados. O
+  preenchimento lateral foi rebaixado para revelar melhor chão, limites e
+  profundidade sem adicionar novas luzes ou sombras.
+- **Sala Final:** paredes, piso e mobiliário receberam pequeno ganho de
+  legibilidade. O contraste da luminária principal foi reduzido e uma única
+  luz de preenchimento sem sombras revela o armário e o fundo, preservando o
+  foco já existente sobre o dossiê.
+- **Dossiê:** a folha passou a usar dimensões responsivas menores, mantendo
+  rolagem e conteúdo intactos para mostrar mais do cenário 3D ao redor.
+
+**Validação realizada:** sintaxe dos JavaScripts, imports locais, parsing do
+HTML, `git diff --check`, referências estáticas e respostas do servidor local.
+
+**Teste manual restante:** confirmar iluminação e navegação reais da Sala C,
+composição da Sala Final e legibilidade das duas páginas nas resoluções usadas
+na apresentação. Não houve teste visual/WebGL nesta sessão.
+
+### 16/08/2026 — Sessão 23 (objetos da Cozinha + reações)
+
+- **Polimento dos 16 objetos** (`modelos.js`): faca, tesoura, amolador,
+  espeto, garfo, panela, tábua, toalha, gelo, prato, copo, mancha, caderno,
+  etiqueta, relógio e câmera foram reconstruídos com silhuetas maiores,
+  proporções revisadas, materiais coerentes e partes funcionais separadas.
+  Permanecem procedurais e leves, sem modelos ou texturas externas.
+- **Reações especiais** (`reacoes.js`, novo): módulo pequeno de animações e
+  sons sintetizados para os 16 objetos. Reutiliza o clique existente e executa
+  cada reação uma vez por instância da Cozinha. Alterações como trincas,
+  expansão, abertura, queda e deslocamento permanecem visíveis na sala.
+- **Integração** (`main.js` + `index.html`): o registro no `Estado` continua
+  ocorrendo antes da reação. Foram adicionados apenas a atualização das
+  animações e um overlay compartilhado para sangue discreto, frio e flash. As
+  rotas, clusters, HUD, colisões, relatório e encerramento não foram alterados.
+
+**Validação realizada:** `node --check` em todos os JavaScripts, cobertura dos
+16 modelos e 16 reações, imports locais, parsing e IDs do HTML,
+`git diff --check` e HTTP 200 para motor, modelos, reações, cozinha, dados e
+estado no servidor estático.
+
+**Teste manual restante:** avaliar reconhecimento/escala dos 16 objetos na luz
+real da Cozinha, alcance do raycast, volume dos sons, intensidade dos efeitos
+de tela e execução completa de cada reação. Não houve teste visual WebGL ou de
+áudio real nesta sessão.

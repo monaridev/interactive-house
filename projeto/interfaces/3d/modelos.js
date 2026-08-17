@@ -1,284 +1,304 @@
-// Um modelo por objeto da Cozinha, montado com primitivas do Three.
-//
-// Por que primitivas em vez de .glb importado:
-// WORLD_DESIGN.md é explícito — "objetos comuns, nunca mágicos", "poucas
-// cores", "tudo parece comum". O que o jogador precisa reconhecer é a
-// SILHUETA (aquilo é uma faca, aquilo é uma panela), não o número de
-// polígonos. Uma faca é uma lâmina fina e um cabo; modelada em duas caixas
-// ela já lê como faca à meia-luz. Além disso .glb exigiria loader
-// assíncrono, arquivos binários no repo e um pipeline de arte que a equipe
-// não tem — e ENGINE.md manda não implementar tecnologia só pra impressionar.
-//
-// O que os cubos coloridos anteriores custavam:
-// eles pintavam cada objeto com a cor do cluster dele. Isso VAZAVA a
-// lógica da porta — o jogador via, de longe, quais objetos "andam juntos",
-// e a Sessão 6 decidiu explicitamente que essa lógica não é revelada.
-// Agora a cor vem do material real (aço, madeira, louça, pano, papel),
-// que é uma propriedade do objeto, não da regra escondida.
-//
-// Convenção: todo modelo nasce com a BASE em y = 0 e o comprimento no
-// eixo Z. Quem posiciona só escolhe a altura da superfície de apoio e o
-// ângulo — não precisa saber a geometria interna de nada.
+// Modelos procedurais leves da experiência 3D.
+// Cada silhueta contém as partes necessárias para leitura imediata. As peças
+// que reagem ao clique recebem `name`, mantendo o motor separado da modelagem.
 
 import * as THREE from "three"
 import { TEX } from "./texturas.js"
 
-// ---------- materiais compartilhados ----------
-// Compartilhar instância importa: são 16 objetos, e material novo por
-// mesh significa um shader novo por mesh.
 const M = {
-  aco: new THREE.MeshStandardMaterial({
-    map: TEX.metal(1, 1),
-    color: 0x9aa0a6,
-    roughness: 0.34,
-    metalness: 0.85,
-  }),
-  acoEscuro: new THREE.MeshStandardMaterial({
-    map: TEX.metal(1, 1),
-    color: 0x5c6166,
-    roughness: 0.5,
-    metalness: 0.8,
-  }),
-  madeira: new THREE.MeshStandardMaterial({
-    map: TEX.madeiraClara(1, 1),
-    roughness: 0.78,
-    metalness: 0,
-  }),
-  madeiraEscura: new THREE.MeshStandardMaterial({
-    map: TEX.madeiraEscura(1, 1),
-    roughness: 0.82,
-    metalness: 0,
-  }),
-  louca: new THREE.MeshStandardMaterial({ color: 0xcfc9ba, roughness: 0.28, metalness: 0.02 }),
-  loucaEsmalte: new THREE.MeshStandardMaterial({ color: 0xe2ddd0, roughness: 0.16, metalness: 0.03 }),
-  pano: new THREE.MeshStandardMaterial({ map: TEX.tecido(1, 1), roughness: 0.95, metalness: 0 }),
-  papel: new THREE.MeshStandardMaterial({ map: TEX.papel(1, 1), roughness: 0.9, metalness: 0 }),
-  capaCaderno: new THREE.MeshStandardMaterial({ color: 0x2f2a24, roughness: 0.75, metalness: 0 }),
-  pedra: new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.98, metalness: 0 }),
-  borracha: new THREE.MeshStandardMaterial({ color: 0x1a1816, roughness: 0.9, metalness: 0 }),
-  vidro: new THREE.MeshStandardMaterial({
-    color: 0xbfd0cf,
-    roughness: 0.08,
-    metalness: 0,
-    transparent: true,
-    opacity: 0.28,
-  }),
-  // gelo: sem cor "azul de gelo" chamativo — é só um ponto frio na pedra
-  geada: new THREE.MeshStandardMaterial({
-    color: 0xa9b6b8,
-    roughness: 0.42,
-    metalness: 0,
-    transparent: true,
-    opacity: 0.5,
-  }),
-  vestigio: new THREE.MeshStandardMaterial({ color: 0x0d0c0a, roughness: 1, metalness: 0 }),
-  vestigioBorda: new THREE.MeshStandardMaterial({
-    color: 0x2a2620,
-    roughness: 1,
-    metalness: 0,
-    transparent: true,
-    opacity: 0.55,
-  }),
+  aco: new THREE.MeshStandardMaterial({ map: TEX.metal(1, 1), color: 0xb7bdc1, roughness: 0.25, metalness: 0.9 }),
+  acoEscuro: new THREE.MeshStandardMaterial({ map: TEX.metal(1, 1), color: 0x656b70, roughness: 0.48, metalness: 0.78 }),
+  acoGasto: new THREE.MeshStandardMaterial({ map: TEX.metal(1, 1), color: 0x77766f, roughness: 0.7, metalness: 0.62 }),
+  madeira: new THREE.MeshStandardMaterial({ map: TEX.madeiraClara(1.4, 1.8), color: 0xc09a68, roughness: 0.72 }),
+  madeiraEscura: new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(1, 2), color: 0x5c4937, roughness: 0.8 }),
+  louca: new THREE.MeshStandardMaterial({ color: 0xd3cdbf, roughness: 0.32, metalness: 0.02 }),
+  loucaEsmalte: new THREE.MeshStandardMaterial({ color: 0xeee8db, roughness: 0.14, metalness: 0.02 }),
+  pano: new THREE.MeshStandardMaterial({ map: TEX.tecido(1.5, 1.5), color: 0x9c8e78, roughness: 0.98, side: THREE.DoubleSide }),
+  costura: new THREE.MeshStandardMaterial({ color: 0x665b4b, roughness: 1 }),
+  papel: new THREE.MeshStandardMaterial({ map: TEX.papel(1, 1), color: 0xd2c7aa, roughness: 0.92 }),
+  papelEscuro: new THREE.MeshStandardMaterial({ map: TEX.papel(1, 1), color: 0xa99a78, roughness: 0.96 }),
+  capaCaderno: new THREE.MeshStandardMaterial({ color: 0x403830, roughness: 0.76 }),
+  pedra: new THREE.MeshStandardMaterial({ color: 0x56524b, roughness: 0.96 }),
+  borracha: new THREE.MeshStandardMaterial({ color: 0x1b1917, roughness: 0.88 }),
+  tinta: new THREE.MeshStandardMaterial({ color: 0x25221d, roughness: 1 }),
+  vidro: new THREE.MeshStandardMaterial({ color: 0xc8d9d9, roughness: 0.1, transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide }),
+  vidroFosco: new THREE.MeshStandardMaterial({ color: 0xd5dedc, roughness: 0.82, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
+  lente: new THREE.MeshStandardMaterial({ color: 0x1a2529, roughness: 0.12, metalness: 0.12 }),
+  vestigio: new THREE.MeshStandardMaterial({ color: 0x141310, roughness: 1, transparent: true, opacity: 0.82 }),
+  vestigioBorda: new THREE.MeshStandardMaterial({ color: 0x514a3e, roughness: 1, transparent: true, opacity: 0.52 }),
 }
 
-// atalho: cria mesh, posiciona, rotaciona e pendura no grupo
-function peca(grupo, geom, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
-  const m = new THREE.Mesh(geom, mat)
-  m.position.set(x, y, z)
-  m.rotation.set(rx, ry, rz)
-  m.castShadow = true
-  grupo.add(m)
-  return m
+function peca(grupo, geom, mat, x, y, z, rx = 0, ry = 0, rz = 0, nome = "") {
+  const objeto = new THREE.Mesh(geom, mat)
+  objeto.position.set(x, y, z)
+  objeto.rotation.set(rx, ry, rz)
+  objeto.castShadow = true
+  objeto.receiveShadow = true
+  objeto.name = nome
+  grupo.add(objeto)
+  return objeto
 }
 
-const cx = (r1, r2, h, seg = 16) => new THREE.CylinderGeometry(r1, r2, h, seg)
+const cx = (r1, r2, h, seg = 16, aberto = false) => new THREE.CylinderGeometry(r1, r2, h, seg, 1, aberto)
 const bx = (w, h, d) => new THREE.BoxGeometry(w, h, d)
 
-// ---------- construtores, um por objeto ----------
+function grupoNome(pai, nome, x = 0, y = 0, z = 0) {
+  const grupo = new THREE.Group()
+  grupo.name = nome
+  grupo.position.set(x, y, z)
+  pai.add(grupo)
+  return grupo
+}
+
+function formaIrregular(raios) {
+  const forma = new THREE.Shape()
+  raios.forEach((raio, i) => {
+    const a = (i / raios.length) * Math.PI * 2
+    const x = Math.cos(a) * raio
+    const y = Math.sin(a) * raio * 0.76
+    if (i === 0) forma.moveTo(x, y)
+    else forma.lineTo(x, y)
+  })
+  forma.closePath()
+  return forma
+}
+
+function laminaFaca() {
+  const forma = new THREE.Shape()
+  forma.moveTo(-0.026, 0.045)
+  forma.lineTo(0.026, 0.045)
+  forma.lineTo(0.021, -0.125)
+  forma.lineTo(0, -0.17)
+  forma.lineTo(-0.026, -0.125)
+  forma.closePath()
+  const geom = new THREE.ExtrudeGeometry(forma, { depth: 0.005, bevelEnabled: false })
+  geom.rotateX(Math.PI / 2)
+  return geom
+}
+
+function panoOndulado(largura, profundidade) {
+  const geom = new THREE.PlaneGeometry(largura, profundidade, 5, 4)
+  const pos = geom.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i)
+    const y = pos.getY(i)
+    pos.setZ(i, Math.sin(x * 55 + y * 31) * 0.0035)
+  }
+  pos.needsUpdate = true
+  geom.computeVertexNormals()
+  return geom
+}
+
+function linha(grupo, pontos, material, nome = "") {
+  const geom = new THREE.BufferGeometry().setFromPoints(pontos.map(([x, y, z]) => new THREE.Vector3(x, y, z)))
+  const objeto = new THREE.Line(geom, material)
+  objeto.name = nome
+  grupo.add(objeto)
+  return objeto
+}
+
 const CONSTRUTORES = {
-  // "O metal está frio." — lâmina larga, cabo de madeira, deitada.
   faca: (g) => {
-    peca(g, bx(0.028, 0.005, 0.155), M.aco, 0, 0.006, -0.02)
-    peca(g, bx(0.016, 0.005, 0.03), M.aco, 0, 0.006, 0.072) // espigão
-    peca(g, bx(0.024, 0.019, 0.088), M.madeiraEscura, 0, 0.012, 0.13)
-    peca(g, cx(0.006, 0.006, 0.02, 8), M.acoEscuro, 0, 0.012, 0.088, Math.PI / 2)
+    peca(g, laminaFaca(), M.aco, 0, 0.005, 0, 0, 0, 0, "lamina-faca")
+    peca(g, bx(0.065, 0.018, 0.018), M.acoEscuro, 0, 0.013, 0.055)
+    peca(g, new THREE.CapsuleGeometry(0.022, 0.075, 4, 10), M.madeiraEscura, 0, 0.017, 0.13, Math.PI / 2)
+    for (const z of [0.105, 0.145]) peca(g, cx(0.004, 0.004, 0.046, 8), M.aco, 0, 0.035, z, 0, 0, Math.PI / 2)
   },
 
-  // "As lâminas estão alinhadas, sem qualquer sinal de uso." — fechada, alinhada.
   tesoura: (g) => {
-    // lâminas quase paralelas: sinal de estar fechada, não de uso
-    peca(g, bx(0.011, 0.004, 0.11), M.aco, -0.005, 0.005, -0.035, 0, 0.02)
-    peca(g, bx(0.011, 0.004, 0.11), M.aco, 0.005, 0.009, -0.035, 0, -0.02)
-    peca(g, cx(0.005, 0.005, 0.016, 8), M.acoEscuro, 0, 0.007, 0.022, Math.PI / 2)
-    // argolas
-    const argola = new THREE.TorusGeometry(0.019, 0.005, 8, 16)
-    peca(g, argola, M.borracha, -0.014, 0.007, 0.075, Math.PI / 2, 0, 0.25)
-    peca(g, argola, M.borracha, 0.014, 0.007, 0.075, Math.PI / 2, 0, -0.25)
+    const criarMetade = (nome, lado) => {
+      const metade = grupoNome(g, nome, 0, 0.009, 0.015)
+      metade.rotation.y = lado * 0.25
+      peca(metade, bx(0.018, 0.006, 0.145), M.aco, 0, 0, -0.07)
+      peca(metade, new THREE.ConeGeometry(0.009, 0.035, 4), M.aco, 0, 0, -0.158, -Math.PI / 2)
+      peca(metade, new THREE.TorusGeometry(0.027, 0.006, 8, 20), M.borracha, lado * 0.018, 0, 0.075, Math.PI / 2)
+      peca(metade, bx(0.012, 0.006, 0.06), M.acoEscuro, lado * 0.008, 0, 0.035)
+    }
+    criarMetade("tesoura-esquerda", -1)
+    criarMetade("tesoura-direita", 1)
+    peca(g, cx(0.009, 0.009, 0.022, 12), M.acoEscuro, 0, 0.01, 0.015, Math.PI / 2, 0, 0, "eixo-tesoura")
   },
 
-  // "A pedra está gasta de um lado só, como se alguém tivesse pressa."
   amolador: (g) => {
-    peca(g, bx(0.055, 0.028, 0.18), M.pedra, 0, 0.014, 0)
-    // o desgaste: uma concavidade só na metade esquerda da pedra
-    const gasto = peca(g, bx(0.03, 0.012, 0.12), M.pedra, -0.012, 0.026, -0.01)
-    gasto.material = M.pedra
-    gasto.scale.y = 0.6
-    peca(g, bx(0.062, 0.008, 0.19), M.madeiraEscura, 0, 0.004, 0) // base
+    peca(g, bx(0.095, 0.018, 0.225), M.madeiraEscura, 0, 0.009, 0)
+    peca(g, bx(0.082, 0.045, 0.195), M.pedra, 0, 0.035, -0.005)
+    peca(g, bx(0.014, 0.026, 0.17), M.acoGasto, -0.018, 0.061, -0.005, 0, 0, -0.2)
+    peca(g, bx(0.014, 0.026, 0.17), M.acoGasto, 0.018, 0.061, -0.005, 0, 0, 0.2)
+    const canal = peca(g, bx(0.008, 0.008, 0.155), M.aco.clone(), 0, 0.073, -0.005, 0, 0, 0, "canal-amolador")
+    canal.material.emissive = new THREE.Color(0x000000)
   },
 
-  // "Reto demais para já ter sido usado alguma vez."
   espeto: (g) => {
-    peca(g, cx(0.0035, 0.0035, 0.27, 10), M.aco, 0, 0.004, -0.02, Math.PI / 2)
-    peca(g, cx(0.0035, 0, 0.03, 10), M.aco, 0, 0.004, -0.17, -Math.PI / 2)
-    peca(g, bx(0.014, 0.008, 0.055), M.madeiraEscura, 0, 0.005, 0.14)
+    peca(g, cx(0.0045, 0.0045, 0.31, 10), M.aco, 0, 0.01, -0.015, Math.PI / 2)
+    peca(g, new THREE.ConeGeometry(0.009, 0.048, 10), M.aco, 0, 0.01, -0.194, -Math.PI / 2)
+    peca(g, new THREE.CapsuleGeometry(0.016, 0.06, 3, 8), M.madeiraEscura, 0, 0.014, 0.178, Math.PI / 2)
+    peca(g, new THREE.TorusGeometry(0.014, 0.003, 6, 14), M.acoEscuro, 0, 0.014, 0.23, Math.PI / 2)
   },
 
-  // "Sulcos profundos cobrem toda a extensão da madeira."
   tabua: (g) => {
-    peca(g, bx(0.21, 0.022, 0.31), M.madeira, 0, 0.011, 0)
-    // sulcos: caneluras escuras cruzando a peça, densas e irregulares
-    const sulco = bx(0.0035, 0.004, 0.26)
-    const semente = [0.31, 0.77, 0.12, 0.58, 0.9, 0.43, 0.05, 0.67, 0.22, 0.84, 0.5, 0.38]
-    semente.forEach((s, i) => {
-      peca(
-        g,
-        sulco,
-        M.madeiraEscura,
-        -0.088 + s * 0.176,
-        0.0215,
-        (i % 3) * 0.012 - 0.012,
-        0,
-        (s - 0.5) * 0.5,
-      )
-    })
-    peca(g, cx(0.011, 0.011, 0.024, 10), M.madeiraEscura, 0, 0.011, 0.142) // furo de pendurar
+    peca(g, bx(0.25, 0.028, 0.34), M.madeira, 0, 0.014, 0)
+    peca(g, bx(0.218, 0.004, 0.006), M.madeiraEscura, 0, 0.03, -0.145)
+    peca(g, bx(0.218, 0.004, 0.006), M.madeiraEscura, 0, 0.03, 0.145)
+    peca(g, bx(0.006, 0.004, 0.296), M.madeiraEscura, -0.108, 0.03, 0)
+    peca(g, bx(0.006, 0.004, 0.296), M.madeiraEscura, 0.108, 0.03, 0)
+    for (let i = 0; i < 7; i++) peca(g, bx(0.003, 0.003, 0.245), M.madeiraEscura, -0.075 + i * 0.025, 0.031, (i % 3 - 1) * 0.012, 0, (i - 3) * 0.055)
+    const marca = peca(g, bx(0.012, 0.004, 0.225), M.tinta, 0.05, 0.033, 0, 0, 0.16, 0, "marca-tabua")
+    marca.visible = false
+    peca(g, new THREE.TorusGeometry(0.014, 0.004, 7, 16), M.madeiraEscura, 0, 0.031, 0.148, Math.PI / 2)
   },
 
-  // "Está alinhado perfeitamente ao centro da bancada."
   garfo: (g) => {
-    peca(g, bx(0.018, 0.0035, 0.09), M.aco, 0, 0.004, 0.055) // cabo
-    peca(g, bx(0.026, 0.004, 0.03), M.aco, 0, 0.004, -0.005) // base dos dentes
+    peca(g, new THREE.CapsuleGeometry(0.012, 0.105, 3, 8), M.aco, 0, 0.008, 0.075, Math.PI / 2)
+    peca(g, bx(0.047, 0.006, 0.035), M.aco, 0, 0.008, -0.005)
     for (let i = 0; i < 4; i++) {
-      peca(g, bx(0.0045, 0.0035, 0.05), M.aco, -0.009 + i * 0.006, 0.004, -0.043)
+      peca(g, bx(0.006, 0.005, 0.072), M.aco, -0.018 + i * 0.012, 0.008, -0.055)
+      peca(g, new THREE.ConeGeometry(0.003, 0.018, 5), M.aco, -0.018 + i * 0.012, 0.008, -0.1, -Math.PI / 2)
     }
   },
 
-  // "Está seca por dentro."
   panela: (g) => {
-    const corpo = peca(g, cx(0.105, 0.092, 0.11, 24), M.acoEscuro, 0, 0.055, 0)
-    corpo.material = M.acoEscuro
-    peca(g, new THREE.TorusGeometry(0.105, 0.006, 8, 24), M.aco, 0, 0.11, 0, Math.PI / 2)
-    peca(g, cx(0.088, 0.088, 0.004, 20), M.acoEscuro, 0, 0.012, 0) // fundo interno (seco)
-    // duas alças
-    const alca = bx(0.035, 0.01, 0.012)
-    peca(g, alca, M.borracha, 0.121, 0.088, 0)
-    peca(g, alca, M.borracha, -0.121, 0.088, 0)
+    peca(g, cx(0.125, 0.105, 0.13, 28, true), M.acoEscuro, 0, 0.068, 0)
+    peca(g, cx(0.106, 0.106, 0.008, 28), M.acoGasto, 0, 0.007, 0)
+    peca(g, new THREE.TorusGeometry(0.125, 0.007, 8, 28), M.aco, 0, 0.134, 0, Math.PI / 2)
+    for (const lado of [-1, 1]) {
+      peca(g, bx(0.075, 0.018, 0.028), M.borracha, lado * 0.145, 0.096, 0)
+      peca(g, bx(0.02, 0.035, 0.036), M.acoEscuro, lado * 0.112, 0.087, 0)
+    }
+    const tampa = grupoNome(g, "tampa-panela", 0, 0.14, 0)
+    peca(tampa, cx(0.116, 0.106, 0.016, 28), M.acoGasto, 0, 0.008, 0)
+    peca(tampa, new THREE.TorusGeometry(0.112, 0.005, 8, 28), M.aco, 0, 0.017, 0, Math.PI / 2)
+    peca(tampa, cx(0.022, 0.028, 0.025, 14), M.borracha, 0, 0.033, 0)
   },
 
-  // "Está dobrada em quatro partes iguais, sem uma única marca de uso."
   toalha: (g) => {
-    // quatro dobras visíveis empilhadas, ligeiramente desalinhadas —
-    // desalinhamento mínimo, senão parece "usada", e o texto diz o contrário
-    for (let i = 0; i < 4; i++) {
-      peca(g, bx(0.22 - i * 0.004, 0.011, 0.17 - i * 0.004), M.pano, 0, 0.006 + i * 0.011, 0, 0, i * 0.006)
+    const mover = grupoNome(g, "toalha-movel")
+    for (let i = 0; i < 3; i++) peca(mover, panoOndulado(0.25 - i * 0.008, 0.19 - i * 0.007), M.pano, 0, 0.009 + i * 0.009, 0, -Math.PI / 2, 0, i * 0.015)
+    for (const x of [-0.105, 0.105]) peca(mover, bx(0.004, 0.004, 0.17), M.costura, x, 0.032, 0)
+  },
+
+  gelo: (g) => {
+    const geada = new THREE.MeshStandardMaterial({ color: 0xaac7d1, emissive: 0x203b46, emissiveIntensity: 0.32, roughness: 0.26, transparent: true, opacity: 0.64, side: THREE.DoubleSide, depthWrite: false })
+    const forma = formaIrregular([0.14, 0.12, 0.15, 0.125, 0.16, 0.115, 0.145, 0.13, 0.155, 0.12])
+    const base = peca(g, new THREE.ShapeGeometry(forma), geada, 0, 0.003, 0, -Math.PI / 2, 0, 0, "nucleo-gelo")
+    base.renderOrder = 2
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2
+      const r = 0.12 + (i % 3) * 0.009
+      peca(g, new THREE.ConeGeometry(0.008, 0.035 + (i % 2) * 0.012, 5), geada, Math.cos(a) * r, 0.009, Math.sin(a) * r, Math.PI / 2, 0, -a)
     }
   },
 
-  // "Um ponto da bancada está visivelmente mais frio que o resto."
-  // Não é objeto: é um estado da superfície. Decalque, não volume.
-  gelo: (g) => {
-    const d = peca(g, new THREE.CircleGeometry(0.115, 28), M.geada, 0, 0.001, 0, -Math.PI / 2)
-    d.renderOrder = 1
-    d.material.polygonOffset = true
-    d.material.polygonOffsetFactor = -1
-    // cristais mínimos na borda, o suficiente pra ler como geada
-    const semente = [0.1, 0.35, 0.55, 0.72, 0.88, 0.22, 0.63]
-    semente.forEach((s) => {
-      const a = s * Math.PI * 2
-      peca(g, bx(0.006, 0.002, 0.02), M.geada, Math.cos(a) * 0.085, 0.003, Math.sin(a) * 0.085, 0, -a)
-    })
-  },
-
-  // "Está centralizado, como se esperasse algo que não chegou a vir."
   pratovazio: (g) => {
-    peca(g, cx(0.115, 0.075, 0.018, 28), M.loucaEsmalte, 0, 0.009, 0)
-    peca(g, new THREE.TorusGeometry(0.113, 0.007, 8, 28), M.loucaEsmalte, 0, 0.018, 0, Math.PI / 2)
-    peca(g, cx(0.055, 0.055, 0.003, 20), M.louca, 0, 0.019, 0) // fundo raso, vazio
-  },
-
-  // "Parece ter sido usado há segundos. Está seco por dentro."
-  copo: (g) => {
-    const paredeCopo = new THREE.CylinderGeometry(0.036, 0.031, 0.105, 24, 1, true)
-    peca(g, paredeCopo, M.vidro, 0, 0.053, 0)
-    peca(g, cx(0.031, 0.031, 0.006, 24), M.vidro, 0, 0.004, 0) // fundo
-    // o embaçamento: uma casca opaca por fora, sem líquido nenhum dentro
-    const embacado = new THREE.MeshStandardMaterial({
-      color: 0xc8cfcc,
-      roughness: 0.95,
-      transparent: true,
-      opacity: 0.16,
+    peca(g, cx(0.135, 0.086, 0.025, 32), M.loucaEsmalte, 0, 0.0125, 0)
+    peca(g, new THREE.TorusGeometry(0.132, 0.009, 10, 32), M.loucaEsmalte, 0, 0.027, 0, Math.PI / 2)
+    peca(g, cx(0.074, 0.074, 0.004, 28), M.louca, 0, 0.029, 0)
+    const matTrinca = new THREE.LineBasicMaterial({ color: 0x534c43 })
+    const trincas = [
+      [[0, 0.032, 0], [0.028, 0.034, 0.022], [0.05, 0.035, 0.018], [0.075, 0.036, 0.05]],
+      [[0.027, 0.034, 0.022], [0.04, 0.035, 0.055], [0.06, 0.036, 0.078]],
+      [[0.05, 0.035, 0.018], [0.075, 0.036, -0.008], [0.095, 0.037, -0.02]],
+    ]
+    trincas.forEach((pontos, i) => {
+      const trinca = linha(g, pontos, matTrinca, `trinca-prato-${i}`)
+      trinca.visible = false
     })
-    peca(g, new THREE.CylinderGeometry(0.0375, 0.0325, 0.09, 24, 1, true), embacado, 0, 0.05, 0)
   },
 
-  // "Um contorno no chão foi limpo até demais."
+  copo: (g) => {
+    peca(g, cx(0.047, 0.039, 0.13, 28, true), M.vidro, 0, 0.066, 0)
+    peca(g, cx(0.039, 0.039, 0.008, 28), M.vidro, 0, 0.004, 0)
+    peca(g, new THREE.TorusGeometry(0.047, 0.003, 7, 28), M.vidro, 0, 0.132, 0, Math.PI / 2)
+    peca(g, cx(0.0485, 0.041, 0.102, 28, true), M.vidroFosco, 0, 0.065, 0)
+    for (let i = 0; i < 8; i++) peca(g, new THREE.SphereGeometry(0.0028, 5, 4), M.vidroFosco, Math.sin(i * 1.7) * 0.041, 0.035 + (i % 4) * 0.022, Math.cos(i * 1.7) * 0.041)
+    const matTrinca = new THREE.LineBasicMaterial({ color: 0xe4eeee, transparent: true, opacity: 0.85 })
+    const frente = 0.048
+    const trincas = [
+      [[0, 0.112, frente], [0.008, 0.09, frente], [-0.004, 0.07, frente], [0.012, 0.047, frente]],
+      [[0.008, 0.09, frente], [0.026, 0.08, frente], [0.034, 0.06, frente]],
+      [[-0.004, 0.07, frente], [-0.026, 0.058, frente], [-0.034, 0.035, frente]],
+    ]
+    trincas.forEach((pontos, i) => {
+      const trinca = linha(g, pontos, matTrinca, `trinca-copo-${i}`)
+      trinca.visible = false
+    })
+  },
+
   mancha: (g) => {
-    const base = peca(g, new THREE.CircleGeometry(0.34, 32), M.vestigio, 0, 0.001, 0, -Math.PI / 2)
+    const baseForma = formaIrregular([0.36, 0.3, 0.38, 0.32, 0.35, 0.285, 0.37, 0.31, 0.355, 0.295, 0.34, 0.31])
+    const base = peca(g, new THREE.ShapeGeometry(baseForma), M.vestigio.clone(), 0, 0.002, 0, -Math.PI / 2, 0, 0, "nucleo-mancha")
     base.renderOrder = 1
-    // o contorno que sobrou: um anel mais claro do que o miolo limpo
-    const anel = peca(g, new THREE.RingGeometry(0.3, 0.35, 32), M.vestigioBorda, 0, 0.003, 0, -Math.PI / 2)
-    anel.renderOrder = 2
+    const bordaForma = formaIrregular([0.395, 0.33, 0.405, 0.35, 0.38, 0.32, 0.4, 0.345, 0.385, 0.325, 0.37, 0.34])
+    const borda = peca(g, new THREE.ShapeGeometry(bordaForma), M.vestigioBorda, 0, 0.001, 0, -Math.PI / 2)
+    borda.renderOrder = 0
+    for (let i = 0; i < 4; i++) {
+      const gota = peca(g, new THREE.CircleGeometry(0.025 + i * 0.006, 12), M.vestigio, -0.29 + i * 0.18, 0.003, 0.19 - (i % 2) * 0.42, -Math.PI / 2)
+      gota.scale.set(1.5, 0.7, 1)
+    }
   },
 
-  // "Todas as páginas estão em branco, exceto a última."
   caderno: (g) => {
-    peca(g, bx(0.15, 0.014, 0.205), M.papel, 0, 0.012, 0) // bloco de páginas
-    peca(g, bx(0.158, 0.005, 0.213), M.capaCaderno, 0, 0.0025, 0) // contracapa
-    peca(g, bx(0.158, 0.004, 0.213), M.capaCaderno, 0, 0.021, 0) // capa
-    peca(g, cx(0.004, 0.004, 0.2, 8), M.acoEscuro, -0.076, 0.012, 0, Math.PI / 2) // espiral
+    peca(g, bx(0.19, 0.007, 0.25), M.capaCaderno, 0, 0.004, 0)
+    peca(g, bx(0.178, 0.026, 0.238), M.papel, 0.004, 0.02, 0)
+    for (let i = 0; i < 5; i++) peca(g, bx(0.002, 0.002, 0.225), M.papelEscuro, -0.08 + i * 0.04, 0.034, 0)
+    const capa = grupoNome(g, "capa-caderno", -0.095, 0.036, 0)
+    peca(capa, bx(0.19, 0.006, 0.25), M.capaCaderno, 0.095, 0, 0)
+    peca(capa, bx(0.11, 0.002, 0.055), M.papelEscuro, 0.095, 0.004, -0.035)
+    const pagina = grupoNome(g, "pagina-caderno", -0.09, 0.035, 0)
+    peca(pagina, bx(0.178, 0.002, 0.238), M.papel, 0.089, 0, 0)
+    pagina.visible = false
+    for (let i = 0; i < 8; i++) peca(g, new THREE.TorusGeometry(0.009, 0.0022, 6, 12, Math.PI * 1.45), M.acoEscuro, -0.095, 0.028, -0.095 + i * 0.027, Math.PI / 2, 0, Math.PI / 2)
   },
 
-  // "Um número de catalogação sem correspondência em nenhum registro."
   etiqueta: (g) => {
-    peca(g, bx(0.075, 0.0018, 0.048), M.papel, 0, 0.001, 0)
-    peca(g, cx(0.004, 0.004, 0.004, 8), M.borracha, -0.03, 0.002, 0) // ilhó
-    peca(g, cx(0.0012, 0.0012, 0.06, 6), M.pano, -0.058, 0.002, 0, 0, 0, Math.PI / 2) // cordão
+    const etiqueta = grupoNome(g, "etiqueta-movel", 0, 0.004, -0.035)
+    const forma = new THREE.Shape()
+    forma.moveTo(-0.055, -0.035)
+    forma.lineTo(0.055, -0.035)
+    forma.lineTo(0.055, 0.035)
+    forma.lineTo(-0.04, 0.035)
+    forma.lineTo(-0.055, 0.02)
+    forma.closePath()
+    peca(etiqueta, new THREE.ShapeGeometry(forma), M.papel, 0, 0, 0.035, -Math.PI / 2)
+    peca(etiqueta, new THREE.TorusGeometry(0.007, 0.002, 6, 12), M.acoEscuro, -0.043, 0.003, 0.053, Math.PI / 2)
+    for (let i = 0; i < 3; i++) peca(etiqueta, bx(0.055 - i * 0.008, 0.002, 0.003), M.tinta, 0.01, 0.004, 0.02 + i * 0.014)
+    peca(g, cx(0.0015, 0.0015, 0.09, 6), M.costura, -0.08, 0.004, 0, 0, 0, Math.PI / 2)
   },
 
-  // "Está parado numa hora que não bate com nenhum outro relógio da casa."
   relogio: (g) => {
-    // apoiado na prateleira, mostrador voltado pra fora do móvel
-    peca(g, cx(0.085, 0.085, 0.028, 28), M.capaCaderno, 0, 0.086, 0, Math.PI / 2)
-    peca(g, cx(0.075, 0.075, 0.002, 28), M.papel, 0, 0.086, 0.015, Math.PI / 2)
-    peca(g, new THREE.TorusGeometry(0.084, 0.005, 8, 28), M.acoEscuro, 0, 0.086, 0.014)
-    // ponteiros travados numa hora arbitrária e assimétrica
-    peca(g, bx(0.005, 0.0015, 0.05), M.borracha, 0.013, 0.1, 0.018, Math.PI / 2, 0, 0.35)
-    peca(g, bx(0.004, 0.0015, 0.035), M.borracha, -0.016, 0.077, 0.018, Math.PI / 2, 0, -1.15)
-    peca(g, cx(0.005, 0.005, 0.006, 10), M.acoEscuro, 0, 0.086, 0.018, Math.PI / 2)
-    peca(g, bx(0.05, 0.014, 0.03), M.capaCaderno, 0, 0.007, 0) // pé
+    const corpo = grupoNome(g, "corpo-relogio")
+    peca(corpo, cx(0.098, 0.098, 0.038, 32), M.capaCaderno, 0, 0.106, 0, Math.PI / 2)
+    peca(corpo, cx(0.085, 0.085, 0.004, 32), M.papel, 0, 0.106, 0.022, Math.PI / 2)
+    peca(corpo, new THREE.TorusGeometry(0.096, 0.006, 8, 32), M.acoEscuro, 0, 0.106, 0.022)
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2
+      peca(corpo, bx(0.003, 0.012, 0.002), M.tinta, Math.sin(a) * 0.07, 0.106 + Math.cos(a) * 0.07, 0.026, 0, 0, -a)
+    }
+    peca(corpo, bx(0.005, 0.05, 0.003), M.tinta, 0.012, 0.126, 0.027, 0, 0, -0.55, "ponteiro-minuto")
+    peca(corpo, bx(0.005, 0.038, 0.003), M.tinta, -0.014, 0.092, 0.028, 0, 0, 1.02, "ponteiro-hora")
+    peca(corpo, cx(0.006, 0.006, 0.008, 10), M.acoEscuro, 0, 0.106, 0.028, Math.PI / 2)
+    peca(corpo, bx(0.07, 0.018, 0.055), M.capaCaderno, 0, 0.009, -0.005)
+    peca(corpo, bx(0.025, 0.032, 0.04), M.capaCaderno, -0.064, 0.022, -0.005, 0, 0, -0.22)
+    peca(corpo, bx(0.025, 0.032, 0.04), M.capaCaderno, 0.064, 0.022, -0.005, 0, 0, 0.22)
+    peca(corpo, cx(0.014, 0.018, 0.025, 12), M.acoEscuro, 0, 0.22, 0)
   },
 
-  // "A lente está voltada para a bancada. Não há cabo, nem luz de gravação."
   camera: (g) => {
-    peca(g, bx(0.062, 0.048, 0.05), M.borracha, 0, 0.024, 0)
-    peca(g, cx(0.019, 0.021, 0.026, 20), M.acoEscuro, 0, 0.03, 0.036, Math.PI / 2)
-    peca(g, cx(0.014, 0.014, 0.003, 20), M.vidro, 0, 0.03, 0.05, Math.PI / 2) // lente
-    peca(g, cx(0.008, 0.011, 0.022, 10), M.acoEscuro, 0, 0.008, -0.008) // pedestal
+    peca(g, bx(0.105, 0.072, 0.064), M.borracha, 0, 0.043, 0)
+    peca(g, bx(0.04, 0.018, 0.055), M.acoEscuro, -0.02, 0.086, -0.002)
+    peca(g, bx(0.027, 0.008, 0.02), M.aco, 0.034, 0.084, -0.005, 0, 0, 0, "botao-camera")
+    peca(g, cx(0.03, 0.035, 0.035, 24), M.acoEscuro, 0, 0.048, 0.048, Math.PI / 2)
+    peca(g, cx(0.022, 0.022, 0.006, 24), M.lente, 0, 0.048, 0.068, Math.PI / 2)
+    peca(g, new THREE.TorusGeometry(0.029, 0.004, 8, 24), M.aco, 0, 0.048, 0.069)
+    const flashMat = new THREE.MeshStandardMaterial({ color: 0xd9d2bb, emissive: 0x000000, roughness: 0.22 })
+    peca(g, bx(0.025, 0.018, 0.005), flashMat, -0.034, 0.069, 0.034, 0, 0, 0, "flash-camera")
+    peca(g, cx(0.01, 0.013, 0.025, 10), M.acoEscuro, 0, 0.013, -0.006)
   },
 }
 
-// A porta é o único "objeto" que também é arquitetura, então mora aqui
-// separada — quem constrói a sala é que decide onde ela encaixa.
 export function criarPorta(largura, altura) {
   const g = new THREE.Group()
-  const folha = new THREE.MeshStandardMaterial({
-    map: TEX.madeiraEscura(1, 2),
-    color: 0x6a5c48,
-    roughness: 0.82,
-    metalness: 0,
-  })
+  const folha = new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(1, 2), color: 0x6a5c48, roughness: 0.82 })
   peca(g, bx(largura, altura, 0.042), folha, 0, altura / 2, 0)
-  // almofadas em relevo — o que separa "porta" de "retângulo escuro"
   const almofada = bx(largura * 0.62, altura * 0.32, 0.01)
   peca(g, almofada, folha, 0, altura * 0.7, 0.026)
   peca(g, almofada, folha, 0, altura * 0.29, 0.026)
@@ -290,10 +310,6 @@ export function criarModelo(id) {
   const g = new THREE.Group()
   const construtor = CONSTRUTORES[id]
   if (!construtor) {
-    // Fallback deliberadamente sem graça: se um objeto novo entrar em
-    // dados.js sem modelo, ele aparece como um bloco neutro em vez de
-    // sumir da sala — a ausência silenciosa seria muito mais difícil de
-    // achar do que um bloco fora de lugar.
     peca(g, bx(0.09, 0.09, 0.09), M.pedra, 0, 0.045, 0)
     console.warn(`[3d] sem modelo para "${id}" — usando bloco neutro`)
     return g
@@ -302,6 +318,4 @@ export function criarModelo(id) {
   return g
 }
 
-// Objetos que são marcas na superfície, não volumes: não recebem sombra
-// própria nem colisão, e ficam rentes ao apoio.
 export const DECALQUES = new Set(["mancha", "gelo"])

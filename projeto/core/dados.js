@@ -183,6 +183,14 @@ window.DATA = {
         { id: "selo", nome: "Selo", icone: "selo", fala: "Um carimbo institucional que não corresponde a nenhum órgão conhecido." },
         { id: "porta", nome: "Porta", icone: "porta", ehSaida: true, proxima: "relatorio" }
       ]
+    },
+    salaFinal: {
+      titulo: "Sala final",
+      prefixo: "FINAL",
+      descricao: "Uma pequena sala institucional de avaliação. Sobre a mesa, um único arquivo aguarda consulta.",
+      objetos: [
+        { id: "dossie", nome: "Arquivo", icone: "caderno", fala: "Examinar registro" }
+      ]
     }
   },
   relatorios: {

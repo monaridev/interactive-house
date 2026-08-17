@@ -39,6 +39,45 @@
     background: var(--fundo); opacity: 0; pointer-events: none;
   }
 
+  /* Uma única camada barata atende sangue, frio e flash. As reações não
+     adicionam passes ao composer e nunca capturam o clique do jogador. */
+  #efeito-reacao {
+    position: fixed; inset: 0; z-index: 4; pointer-events: none;
+    opacity: 0;
+  }
+  #efeito-reacao.efeito-sangue {
+    background:
+      radial-gradient(circle at 18% 22%, transparent 0 58%, rgba(91, 5, 8, .36) 78%, rgba(62, 0, 3, .6) 100%),
+      linear-gradient(115deg, transparent 0 67%, rgba(113, 8, 11, .38) 68% 69%, transparent 70%);
+    animation: efeito-sangue 1.4s ease-out forwards;
+  }
+  #efeito-reacao.efeito-frio {
+    background: radial-gradient(ellipse at center, transparent 34%, rgba(86, 173, 205, .16) 67%, rgba(113, 202, 231, .38) 100%);
+    animation: efeito-frio 1.5s ease-in-out forwards;
+  }
+  #efeito-reacao.efeito-flash {
+    background: #eaf3ff;
+    animation: efeito-flash .4s ease-out forwards;
+  }
+  canvas.tremor-leve { animation: tremor-leve .22s ease-out; }
+  canvas.tremor-corte { animation: tremor-corte .3s ease-out; }
+  @keyframes efeito-sangue { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes efeito-frio { 0%, 100% { opacity: 0; } 25% { opacity: .9; } 55% { opacity: .62; } }
+  @keyframes efeito-flash { 0% { opacity: .92; } 28% { opacity: .52; } 100% { opacity: 0; } }
+  @keyframes tremor-leve {
+    0%, 100% { transform: translate(0); }
+    25% { transform: translate(-2px, 1px); }
+    50% { transform: translate(2px, -1px); }
+    75% { transform: translate(-1px, -1px); }
+  }
+  @keyframes tremor-corte {
+    0%, 100% { transform: translate(0); }
+    18% { transform: translate(-4px, 2px); }
+    38% { transform: translate(3px, -2px); }
+    62% { transform: translate(-2px, -1px); }
+    82% { transform: translate(1px, 1px); }
+  }
+
   /* Notificação de campo: um painel de levantamento, não uma legenda
      permanente. Toda mensagem entra, permanece legível por 5s e some. */
   #hud {
@@ -172,8 +211,121 @@
     letter-spacing: .08em; padding: 5px 9px; transform: rotate(-4deg);
     text-transform: uppercase; pointer-events: none;
   }
+
+  /* Fluxo principal novo: o papel ocupa só parte da tela e a Sala Final
+     continua visível atrás. O estilo antigo acima permanece sendo usado
+     por .modo-fallback no final apressado e em recuperação de erro. */
+  #relatorio-overlay.modo-dossie {
+    padding: clamp(14px, 3vh, 30px);
+    background: rgba(4, 5, 5, .67);
+    background-image: none;
+    backdrop-filter: blur(2px) saturate(.72);
+    transition: opacity .34s ease, visibility 0s linear .34s, background .48s ease;
+  }
+  #relatorio-overlay.modo-dossie.visivel { transition: opacity .34s ease, background .48s ease; }
+  .dossie-papel {
+    --papel: #c9bfa7; --papel-claro: #d4cbb5; --tinta-doc: #302b22;
+    --tinta-fraca-doc: #655d4e; --linha-doc: #8b816d; --carimbo: #743c35;
+    position: relative; box-sizing: border-box;
+    width: min(680px, 84vw); height: min(68vh, 620px); min-height: 410px;
+    display: grid; grid-template-rows: auto 1fr auto;
+    padding: clamp(26px, 4vh, 42px) clamp(24px, 4.5vw, 54px) 20px;
+    overflow: hidden;
+    color: var(--tinta-doc); background-color: var(--papel);
+    background-image:
+      radial-gradient(circle at 14% 18%, #7d6c4915 0 1px, transparent 2px),
+      radial-gradient(circle at 83% 72%, #66563210 0 1px, transparent 2px),
+      repeating-linear-gradient(0deg, transparent 0 3px, #2b241808 3px 4px),
+      linear-gradient(105deg, #a99e8517, transparent 24%, #fff3 52%, transparent 78%);
+    border: 1px solid #8e846f; box-shadow: 0 24px 80px rgba(0,0,0,.72), inset 0 0 50px #5a4b2d1d;
+    font-family: "Courier New", ui-monospace, monospace;
+    opacity: 0; transform: translateY(12px) scale(.985);
+    transition: opacity .28s ease, transform .28s ease;
+  }
+  .dossie-papel.aberto { opacity: 1; transform: none; }
+  .dossie-papel::before {
+    content: ""; position: absolute; inset: 10px; pointer-events: none;
+    border: 1px solid rgba(73,64,48,.25);
+  }
+  .dossie-cabecalho {
+    display: grid; grid-template-columns: 1fr auto; gap: 24px;
+    padding-bottom: 14px; border-bottom: 1px solid var(--linha-doc);
+    font-size: 9px; letter-spacing: .045em; line-height: 1.55;
+  }
+  .dossie-cabecalho span, .dossie-cabecalho strong { display: block; }
+  .dossie-cabecalho > div:first-child > strong { font-size: 10px; }
+  .dossie-registro {
+    min-width: 112px; padding-left: 18px; border-left: 1px solid var(--linha-doc);
+    color: var(--tinta-fraca-doc);
+  }
+  .dossie-registro strong { margin: 2px 0 4px; color: var(--tinta-doc); font-size: 22px; letter-spacing: .02em; }
+  .dossie-fechar {
+    all: unset; position: absolute; top: 12px; right: 15px; z-index: 2;
+    width: 28px; height: 28px; cursor: pointer; text-align: center;
+    color: #5d5547; font-size: 20px; line-height: 28px;
+  }
+  .dossie-fechar:hover, .dossie-fechar:focus-visible { color: #201d18; outline: 1px solid #756a57; }
+  .dossie-corpo { overflow: auto; padding: clamp(18px, 3vh, 30px) 5px 16px 0; scrollbar-color: #827762 transparent; }
+  .dossie-setor { margin: 0 0 8px; color: var(--carimbo); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+  .dossie-corpo h1 {
+    margin: 0 0 clamp(18px, 3vh, 30px); text-align: center;
+    font: 700 clamp(19px, 2.5vw, 27px)/1.2 Georgia, "Times New Roman", serif;
+    letter-spacing: .04em; text-transform: uppercase;
+  }
+  .dossie-corpo h2 {
+    margin: 0 0 6px; color: var(--carimbo);
+    font-size: 10px; line-height: 1.35; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .dossie-corpo section { margin: 0 0 20px; }
+  .dossie-corpo section p { margin: 0; font-size: clamp(12px, 1.55vw, 14px); line-height: 1.65; white-space: pre-line; }
+  .dossie-metadados {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+    margin: 0 0 24px; border: 1px solid var(--linha-doc); background: var(--linha-doc);
+  }
+  .dossie-metadados > div { padding: 10px 12px; background: var(--papel-claro); }
+  .dossie-metadados dt { color: var(--tinta-fraca-doc); font-size: 9px; text-transform: uppercase; }
+  .dossie-metadados dd { margin: 4px 0 0; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+  .dossie-navegacao {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
+    min-height: 36px; padding-top: 12px; border-top: 1px solid var(--linha-doc);
+    color: var(--tinta-fraca-doc); font-size: 10px; letter-spacing: .05em; text-transform: uppercase;
+  }
+  .dossie-navegacao button {
+    all: unset; cursor: pointer; padding: 8px 0; color: var(--tinta-fraca-doc);
+  }
+  .dossie-navegacao button:first-child { justify-self: start; }
+  .dossie-navegacao button:last-child { justify-self: end; text-align: right; }
+  .dossie-navegacao button:hover, .dossie-navegacao button:focus-visible { color: var(--tinta-doc); text-decoration: underline; }
+  .dossie-carimbo {
+    position: absolute; right: 38px; bottom: 62px; padding: 5px 9px;
+    border: 2px solid #743c3599; color: #743c3599; transform: rotate(-5deg);
+    font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    pointer-events: none;
+  }
+  #relatorio-overlay.modo-dossie.encerrando,
+  #relatorio-overlay.modo-dossie.encerrado { background: #050506; backdrop-filter: none; }
+  .encerramento-final {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    color: var(--tinta); font-family: "Courier New", ui-monospace, monospace;
+    opacity: 0; animation: aparecer-final .8s ease .12s forwards;
+  }
+  .encerramento-final span { color: var(--tinta-fraca); font-size: 10px; letter-spacing: .28em; }
+  .encerramento-final strong { font-size: clamp(18px, 3vw, 28px); letter-spacing: .08em; text-transform: uppercase; }
+  .encerramento-final p { margin: 0; color: var(--tinta-fraca); font-size: 12px; }
+  @keyframes aparecer-final { to { opacity: 1; } }
+  @media (max-width: 620px), (max-height: 620px) {
+    .dossie-papel { width: 90vw; height: 78vh; min-height: 340px; padding: 24px 22px 16px; }
+    .dossie-cabecalho { gap: 12px; }
+    .dossie-registro { min-width: 88px; padding-left: 10px; }
+    .dossie-registro strong { font-size: 17px; }
+    .dossie-metadados { grid-template-columns: 1fr; }
+    .dossie-carimbo { display: none; }
+    .dossie-navegacao { gap: 8px; font-size: 9px; }
+  }
   @media (prefers-reduced-motion: reduce) {
-    #relatorio-overlay, #relatorio-overlay .ficha { transition: none; }
+    #relatorio-overlay, #relatorio-overlay .ficha, .dossie-papel { transition: none; }
+    .encerramento-final { animation-duration: .01ms; animation-delay: 0s; }
+    canvas.tremor-leve, canvas.tremor-corte { animation: none; }
   }
 </style>
 
@@ -208,6 +360,7 @@
     <strong id="hud-titulo"></strong>
     <span id="hud-texto"></span>
   </aside>
+  <div id="efeito-reacao" aria-hidden="true"></div>
   <div id="transicao"></div>
   <div id="relatorio-overlay" role="region" aria-label="Encerramento do levantamento" aria-hidden="true"></div>
 

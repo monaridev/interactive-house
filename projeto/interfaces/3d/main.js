@@ -22,18 +22,26 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js"
 import { construirCozinha } from "./cozinha.js"
 import { construirCorredor } from "./corredor.js"
 import { construirSalaA } from "./sala-a.js"
+import { construirSalaB } from "./sala-b.js"
+import { construirSalaC } from "./sala-c.js"
+import { construirSalaD } from "./sala-d.js"
+import { construirSalaFinal } from "./sala-final.js"
+import { criarSistemaReacoes } from "./reacoes.js"
 import { resolverMovimento, desencaixar } from "./colisao.js"
 
 // ---------- registro de salas 3D ----------
 // Quando a porta calcula um destino que está aqui, a troca é real (nova
 // geometria, câmera reposicionada). "relatorio" e "relatorioApressado" são
 // tratados à parte, antes desta checagem (ver encerrarExperiencia) — não
-// são salas, são o fim da experiência. Só salaB-D ainda não existem em
-// 3D: pra elas, a porta mostra o texto de sempre, sem sala nenhuma pra ir.
+// são salas, são o fim da experiência.
 const SALAS_3D = {
   cozinha: construirCozinha,
   corredor: construirCorredor,
   salaA: construirSalaA,
+  salaB: construirSalaB,
+  salaC: construirSalaC,
+  salaD: construirSalaD,
+  salaFinal: construirSalaFinal,
 }
 
 // ---------- cena ----------
@@ -57,6 +65,10 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap
 renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.toneMappingExposure = 1.15
 document.body.prepend(renderer.domElement)
+const reacoes = criarSistemaReacoes({
+  canvas: renderer.domElement,
+  efeitoTela: document.getElementById("efeito-reacao"),
+})
 
 // ---------- composição (pra ter contorno de verdade no hover) ----------
 // Contorno de seleção via OutlinePass, não mais uma luz posicionada no
@@ -93,9 +105,12 @@ let grupoSalaAtual = null // tudo que a sala pôs na cena, num Group só
 // ---------- movimento em 1ª pessoa ----------
 const controls = new PointerLockControls(camera, renderer.domElement)
 const capa = document.getElementById("capa")
+let leituraAberta = false
 capa.addEventListener("click", () => controls.lock())
 controls.addEventListener("lock", () => capa.classList.add("oculto"))
-controls.addEventListener("unlock", () => capa.classList.remove("oculto"))
+controls.addEventListener("unlock", () => {
+  if (!leituraAberta) capa.classList.remove("oculto")
+})
 
 const teclas = { w: false, a: false, s: false, d: false, shift: false }
 const MAPA_TECLAS = { arrowup: "w", arrowleft: "a", arrowdown: "s", arrowright: "d" }
@@ -105,6 +120,7 @@ function normalizar(e) {
   return MAPA_TECLAS[k] || k
 }
 addEventListener("keydown", (e) => {
+  if (leituraAberta) return
   const k = normalizar(e)
   if (k in teclas) teclas[k] = true
 })
@@ -167,6 +183,10 @@ function mover(delta) {
 
 // ---------- interação por raycast ----------
 const raycaster = new THREE.Raycaster()
+// As trincas do prato e do copo são THREE.Line. O padrão do Three aceita
+// linhas a até 1 metro do raio, criando uma área de seleção invisível enorme.
+// Um centímetro acompanha o desenho real e impede o copo de roubar vizinhos.
+raycaster.params.Line.threshold = 0.01
 const ALCANCE = 2.1
 const centro = new THREE.Vector2(0, 0)
 const hud = document.getElementById("hud")
@@ -281,6 +301,9 @@ capa.addEventListener("click", iniciarAudio)
 // canvas 3D, em vez de trocar o conteúdo da página inteira.
 const overlayRelatorio = document.getElementById("relatorio-overlay")
 const CLUSTER_LABEL = { corte: "Corte", domestico: "Doméstico", vazio: "Vazio", registro: "Registro" }
+const REGISTRO_ID = { salaA: "41-A", salaB: "41-B", salaC: "41-C", salaD: "41-D" }
+const SALAS_DESFECHO = new Set(["salaA", "salaB", "salaC", "salaD"])
+let rotaFinalId = null
 
 function digitarTexto(elemento, texto, velocidade, aoTerminar) {
   elemento.textContent = ""
@@ -354,12 +377,139 @@ function mostrarRelatorio(salaFinalId) {
 // O overlay cobre a tela inteira, então cliques não voltam a alcançar o
 // canvas por baixo.
 function encerrarExperiencia(salaFinalId) {
+  leituraAberta = true
   controls.unlock()
   outlinePass.selectedObjects = []
   hud.classList.remove("visivel")
   overlayRelatorio.setAttribute("aria-hidden", "false")
-  overlayRelatorio.classList.add("visivel")
+  overlayRelatorio.className = "visivel modo-fallback"
   mostrarRelatorio(salaFinalId)
+}
+
+// ---------- dossiê da Sala Final ----------
+// O relatório antigo acima permanece intacto como fallback. O fluxo normal
+// das quatro salas agora passa por este leitor de duas páginas, mantendo a
+// Sala Final renderizada atrás do papel.
+function dadosDoDossie() {
+  const id = rotaFinalId
+  const salaOrigem = id && DATA.salas[id]
+  const clusterId = salaOrigem?.cluster
+  if (!salaOrigem || !clusterId) return null
+
+  const comportamento = DATA.comportamentos?.[clusterId] || "Nenhuma conclusão definitiva pode ser extraída."
+  const [interpretacao, observacaoFinal] = comportamento.split(/\n\n+/)
+  return {
+    id,
+    registro: REGISTRO_ID[id] || "41-—",
+    cluster: CLUSTER_LABEL[clusterId] || "Não identificado",
+    relatorio: DATA.relatorios?.[id]?.texto || "O levantamento foi encerrado.",
+    objetosAnalisados: Estado.contarCliques("cozinha"),
+    interpretacao,
+    observacaoFinal: observacaoFinal || "Nenhuma conclusão definitiva pode ser extraída.",
+  }
+}
+
+function estruturaDocumento(conteudo, pagina) {
+  overlayRelatorio.innerHTML = `
+    <article class="dossie-papel" data-pagina="${pagina}">
+      <header class="dossie-cabecalho">
+        <div><strong>INSTITUTO DE OBSERVAÇÃO E COMPORTAMENTO</strong><span>SETOR DE ANÁLISE · NÚCLEO INTERNO</span></div>
+        <div class="dossie-registro"><span>Nº DO REGISTRO</span><strong>${conteudo.registro}</strong><span>${new Date().toLocaleDateString("pt-BR")}</span></div>
+      </header>
+      <button type="button" class="dossie-fechar" aria-label="Fechar arquivo">×</button>
+      <div class="dossie-corpo"></div>
+      <footer class="dossie-navegacao"></footer>
+      <div class="dossie-carimbo">confidencial</div>
+    </article>
+  `
+  const papel = overlayRelatorio.querySelector(".dossie-papel")
+  requestAnimationFrame(() => papel.classList.add("aberto"))
+  overlayRelatorio.querySelector(".dossie-fechar").addEventListener("click", fecharDossie)
+  return {
+    corpo: overlayRelatorio.querySelector(".dossie-corpo"),
+    navegacao: overlayRelatorio.querySelector(".dossie-navegacao"),
+  }
+}
+
+function mostrarPaginaDossie(pagina) {
+  const conteudo = dadosDoDossie()
+  if (!conteudo) {
+    encerrarExperiencia(rotaFinalId || "apressado")
+    return
+  }
+
+  const { corpo, navegacao } = estruturaDocumento(conteudo, pagina)
+  if (pagina === 1) {
+    corpo.innerHTML = `
+      <p class="dossie-setor">RELATÓRIO INTERNO</p>
+      <h1>Registro de observação</h1>
+      <dl class="dossie-metadados">
+        <div><dt>Cluster identificado</dt><dd>${conteudo.cluster}</dd></div>
+        <div><dt>Objetos analisados</dt><dd>${conteudo.objetosAnalisados}</dd></div>
+      </dl>
+      <section><h2>Relatório</h2><p>${conteudo.relatorio}</p></section>
+    `
+    navegacao.innerHTML = `<span></span><strong>1 / 2</strong><button type="button" data-proxima>Próxima página →</button>`
+    navegacao.querySelector("[data-proxima]").addEventListener("click", () => mostrarPaginaDossie(2))
+  } else {
+    corpo.innerHTML = `
+      <p class="dossie-setor">CATALOGAÇÃO FINAL DO VISITANTE</p>
+      <h1>Catalogação do visitante</h1>
+      <section><h2>Classificação</h2><p>${conteudo.cluster}</p></section>
+      <section><h2>Interpretação</h2><p>${conteudo.interpretacao}</p></section>
+      <section><h2>Observação final</h2><p>${conteudo.observacaoFinal}</p></section>
+    `
+    navegacao.innerHTML = `<button type="button" data-voltar>← Voltar</button><strong>2 / 2</strong><button type="button" data-encerrar>Encerrar levantamento</button>`
+    navegacao.querySelector("[data-voltar]").addEventListener("click", () => mostrarPaginaDossie(1))
+    navegacao.querySelector("[data-encerrar]").addEventListener("click", encerrarLevantamento)
+  }
+}
+
+function abrirDossie() {
+  if (leituraAberta) return
+  const conteudo = dadosDoDossie()
+  if (!conteudo) {
+    encerrarExperiencia(rotaFinalId || "apressado")
+    return
+  }
+
+  leituraAberta = true
+  Object.keys(teclas).forEach((k) => (teclas[k] = false))
+  outlinePass.selectedObjects = []
+  clearTimeout(temporizadorHud)
+  hud.classList.remove("visivel")
+  controls.unlock()
+  capa.classList.add("oculto")
+  overlayRelatorio.setAttribute("aria-hidden", "false")
+  overlayRelatorio.className = "visivel modo-dossie"
+  mostrarPaginaDossie(1)
+}
+
+function fecharDossie() {
+  overlayRelatorio.classList.remove("visivel")
+  overlayRelatorio.setAttribute("aria-hidden", "true")
+  leituraAberta = false
+  Object.keys(teclas).forEach((k) => (teclas[k] = false))
+  // Se o navegador negar a retomada automática do pointer lock, a capa
+  // reaparece e oferece um clique normal para continuar.
+  capa.classList.remove("oculto")
+  controls.lock()
+}
+
+function encerrarLevantamento() {
+  const papel = overlayRelatorio.querySelector(".dossie-papel")
+  papel?.classList.remove("aberto")
+  overlayRelatorio.classList.add("encerrando")
+  setTimeout(() => {
+    overlayRelatorio.innerHTML = `
+      <div class="encerramento-final">
+        <span>UNIDADE 04</span>
+        <strong>Catalogação finalizada</strong>
+        <p>Registro encerrado.</p>
+      </div>
+    `
+    overlayRelatorio.className = "visivel modo-dossie encerrado"
+  }, 480)
 }
 
 // ---------- troca de sala ----------
@@ -393,6 +543,7 @@ function limparSala() {
 // como a porta do Corredor, sem que a sala precise conhecer `Estado`
 // diretamente. Ela só recebe um número pelo `ctx`.
 function entrarEm(id) {
+  reacoes.limpar()
   limparSala()
   grupoSalaAtual = new THREE.Group()
   scene.add(grupoSalaAtual)
@@ -418,9 +569,14 @@ entrarEm("cozinha")
 // regra de sempre (WORLD_DESIGN: o sistema não informa progresso), só
 // mudou COMO aparece. `outlinePass` já foi criado lá em cima, junto
 // com o resto do composer.
+let ultimoAlvoHover = null
 function atualizarContorno() {
   const alvo = alvoInterativo()
   outlinePass.selectedObjects = alvo ? [alvo] : []
+  if (alvo !== ultimoAlvoHover) {
+    ultimoAlvoHover = alvo
+    if (alvo?.userData?.tipo === "dossie") escrever(alvo.userData.ref.nome.toUpperCase(), alvo.userData.ref.fala)
+  }
 }
 
 // ---------- transição entre salas (fade + passo) ----------
@@ -479,8 +635,14 @@ renderer.domElement.addEventListener("click", () => {
   if (!alvo) return
   const { tipo, ref } = alvo.userData
 
+  if (tipo === "dossie") {
+    abrirDossie()
+    return
+  }
+
   if (tipo === "objeto") {
     Estado.registrarClique(sala.id, ref.id)
+    if (sala.id === "cozinha") reacoes.disparar(alvo, ref.id)
     const ja = Estado.clicadosDe(sala.id)
     const texto = typeof ref.fala === "function" ? ref.fala(ja) : ref.fala
     escrever(ref.nome.toUpperCase(), texto)
@@ -494,23 +656,26 @@ renderer.domElement.addEventListener("click", () => {
   if (tipo === "porta") {
     const clicados = Estado.clicadosDe(sala.id)
     const destino =
-      typeof sala.porta.proxima === "function"
-        ? sala.porta.proxima(clicados, Estado.snapshotGlobal())
-        : sala.porta.proxima
+      typeof ref.proxima === "function"
+        ? ref.proxima(clicados, Estado.snapshotGlobal())
+        : ref.proxima
     console.log(`[3d] destino calculado: ${destino}`)
 
-    if (destino === "relatorio") {
-      // "relatorio" é genérico — o relatório de verdade é o da sala em
-      // que a porta foi clicada (mesma leitura que o 2D faz de salaId).
+    if (destino === "relatorio" && SALAS_DESFECHO.has(sala.id)) {
+      // dados.js continua com "relatorio" para preservar o terminal 2D.
+      // Na experiência 3D, esse destino passa pela Sala Final e guarda a
+      // origem para preencher o dossiê dinâmico.
+      rotaFinalId = sala.id
+      iniciarTransicao("salaFinal")
+    } else if (destino === "relatorio") {
       encerrarExperiencia(sala.id)
     } else if (destino === "relatorioApressado") {
       encerrarExperiencia("apressado")
     } else if (SALAS_3D[destino]) {
       iniciarTransicao(destino)
     } else {
-      // Ainda não existe em 3D (salaB-D) — mesma mensagem de sempre, sem
-      // vazar o destino calculado pro jogador (isso é só pra depuração,
-      // no console).
+      // Destino inválido não vaza o nome interno pro jogador; o console
+      // acima mantém a informação necessária para depuração.
       escrever("PORTA", "Está entreaberta. Não cede.")
     }
   }
@@ -528,6 +693,10 @@ if (new URLSearchParams(location.search).has("inspecao")) {
       return sala // getter, não valor fixo — continua correto depois de entrarEm() trocar de sala
     },
     ir: entrarEm, // ex.: __inspecao.ir("corredor") pra pular direto sem clicar na porta
+    definirRotaFinal(id) {
+      rotaFinalId = id
+    },
+    abrirDossie,
     olhar(de, para) {
       camera.position.set(de[0], de[1], de[2])
       camera.lookAt(para[0], para[1], para[2])
@@ -555,6 +724,7 @@ function animar() {
     mover(delta)
     atualizarContorno()
   }
+  reacoes.atualizar(delta)
   atualizarOuvinte()
   composer.render()
 }
