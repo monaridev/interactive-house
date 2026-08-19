@@ -2,7 +2,8 @@ import * as THREE from "three"
 import { caixa } from "./colisao.js"
 import { TEX } from "./texturas.js"
 import { criarPorta } from "./modelos.js"
-import { combinacoesRaras, intensidade } from "./vestigios.js"
+import { criarReconstrucao } from "./reconstrucao.js"
+import { combinacoesRaras, intensidade, vestigioPredominante } from "./vestigios.js"
 
 // Sala Final — uma pequena sala de avaliação. Diferente da Sala D, o
 // arquivo não domina a arquitetura: há poucos móveis e toda a composição
@@ -107,15 +108,30 @@ function criarDossie(materiais, vestigios, rota) {
   return grupo
 }
 
+function criarMiniDino(material) {
+  const grupo = new THREE.Group()
+  grupo.add(mesh(new THREE.SphereGeometry(0.055, 9, 6), material, 0, 0.07, 0))
+  grupo.add(mesh(new THREE.SphereGeometry(0.035, 8, 5), material, 0.075, 0.105, 0))
+  grupo.add(mesh(new THREE.ConeGeometry(0.022, 0.16, 7), material, -0.105, 0.072, 0, 0, 0, Math.PI / 2))
+  for (const x of [-0.025, 0.035]) grupo.add(mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.07, 6), material, x, 0.025, 0.015))
+  return grupo
+}
+
 export function construirSalaFinal(scene, ctx = {}) {
   const data = DATA.salas.salaFinal
   const vestigios = ctx.vestigios
   const refDossie = data.objetos.find((objeto) => objeto.id === "dossie")
+  const refDino = data.objetos.find((objeto) => objeto.id === "dino")
+  const refPortaDino = data.objetos.find((objeto) => objeto.id === "porta-dino")
   const refDiario = { id: "diario", nome: "Diário de Bordo", fala: "Folhear o registro" }
   const obstaculos = []
   const interativos = []
   const mx = LARGURA / 2
   const mz = COMPRIMENTO / 2
+  const combinacoes = combinacoesRaras(vestigios, ctx.rotaFinalId)
+  const predominante = vestigioPredominante(vestigios)
+  const analisados = ctx.sessao?.clicadosPorSala?.cozinha?.length || 0
+  const manifestacoes = []
 
   const parede = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 2), color: 0x74736b, roughness: 0.95 })
   const piso = new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(3, 3), color: 0x49443b, roughness: 0.88 })
@@ -160,6 +176,14 @@ export function construirSalaFinal(scene, ctx = {}) {
     scene.add(mesh(new THREE.BoxGeometry(LARGURA - 0.25, 0.035, 0.035), metalEscuro, 0, PE_DIREITO - 0.025, z))
   }
 
+  // A rota não vira legenda: aparece como uma barra de inspeção no teto e
+  // como pequenas divisões no quadro. É cenário, não painel de resultado.
+  const corRota = { salaA: 0x76504b, salaB: 0x806947, salaC: 0x58767d, salaD: 0x5f6d68 }[ctx.rotaFinalId] || 0x61645e
+  const marcaRota = new THREE.MeshStandardMaterial({ color: corRota, emissive: corRota, emissiveIntensity: 0.34, roughness: 0.62 })
+  const deslocamentoRota = { salaA: -1.35, salaB: -0.45, salaC: 0.45, salaD: 1.35 }[ctx.rotaFinalId] || 0
+  scene.add(mesh(new THREE.BoxGeometry(0.62, 0.018, 0.075), marcaRota, deslocamentoRota, PE_DIREITO - 0.054, 0.7))
+  if (ctx.rotaFinalId) manifestacoes.push(`rota:${ctx.rotaFinalId}`)
+
   // Mesa central, robusta e vazia o bastante para o arquivo dominar.
   const mesaL = 1.8
   const mesaP = 1.08
@@ -186,40 +210,66 @@ export function construirSalaFinal(scene, ctx = {}) {
   }
   obstaculos.push(caixa(-0.42, 1.02, 0.62, 0.62))
 
-  // Armário baixo e estante compacta ao fundo: uma descoberta secundária,
-  // fora do eixo mesa–dossiê e sem repetir o corredor de arquivos da Sala D.
-  scene.add(mesh(new THREE.BoxGeometry(1.15, 0.78, 0.38), metal, -1.63, 0.39, -1.82))
+  // Armário e estante formam um único conjunto móvel. A animação e o colisor
+  // compartilham o mesmo deslocamento, evitando uma passagem visualmente
+  // aberta que ainda estivesse bloqueada pelo móvel antigo.
+  const estanteMovel = new THREE.Group()
+  estanteMovel.position.set(-1.63, 0, -1.82)
+  estanteMovel.add(mesh(new THREE.BoxGeometry(1.15, 0.78, 0.38), metal, 0, 0.39, 0))
   for (const y of [0.16, 0.39, 0.62]) {
-    scene.add(mesh(new THREE.BoxGeometry(1.01, 0.18, 0.025), metalEscuro, -1.63, y, -1.615))
-    scene.add(mesh(new THREE.BoxGeometry(0.18, 0.018, 0.018), madeira, -1.63, y, -1.596))
+    estanteMovel.add(mesh(new THREE.BoxGeometry(1.01, 0.18, 0.025), metalEscuro, 0, y, 0.205))
+    estanteMovel.add(mesh(new THREE.BoxGeometry(0.18, 0.018, 0.018), madeira, 0, y, 0.224))
   }
-  scene.add(mesh(new THREE.BoxGeometry(1.12, 1.12, 0.055), metalEscuro, -1.63, 1.42, -1.98))
-  for (const x of [-2.16, -1.1]) {
-    scene.add(mesh(new THREE.BoxGeometry(0.06, 1.12, 0.34), metalEscuro, x, 1.42, -1.84))
+  estanteMovel.add(mesh(new THREE.BoxGeometry(1.12, 1.12, 0.055), metalEscuro, 0, 1.42, -0.16))
+  for (const x of [-0.53, 0.53]) {
+    estanteMovel.add(mesh(new THREE.BoxGeometry(0.06, 1.12, 0.34), metalEscuro, x, 1.42, -0.02))
   }
   for (const y of [0.88, 1.24, 1.6, 1.98]) {
-    scene.add(mesh(new THREE.BoxGeometry(1.03, 0.028, 0.31), metal, -1.63, y, -1.67))
+    estanteMovel.add(mesh(new THREE.BoxGeometry(1.03, 0.028, 0.31), metal, 0, y, 0.15))
   }
   const volumes = [
-    { x: -2, y: 1.055, h: 0.31, cor: 0x75684f, inclinacao: 0.015 },
-    { x: -1.89, y: 1.045, h: 0.29, cor: 0x5f665f, inclinacao: -0.035 },
-    { x: -1.28, y: 1.415, h: 0.32, cor: 0x6d5b48, inclinacao: 0.025 },
-    { x: -1.17, y: 1.405, h: 0.3, cor: 0x5c5548, inclinacao: -0.02 },
+    { x: -0.37, y: 1.055, h: 0.31, cor: 0x75684f, inclinacao: 0.015 },
+    { x: -0.26, y: 1.045, h: 0.29, cor: 0x5f665f, inclinacao: -0.035 },
+    { x: 0.35, y: 1.415, h: 0.32, cor: 0x6d5b48, inclinacao: 0.025 },
+    { x: 0.46, y: 1.405, h: 0.3, cor: 0x5c5548, inclinacao: -0.02 },
   ]
   for (const volume of volumes) {
     const materialVolume = new THREE.MeshStandardMaterial({ color: volume.cor, roughness: 0.91 })
-    scene.add(mesh(new THREE.BoxGeometry(0.085, volume.h, 0.24), materialVolume, volume.x, volume.y, -1.63, 0, 0, volume.inclinacao))
+    estanteMovel.add(mesh(new THREE.BoxGeometry(0.085, volume.h, 0.24), materialVolume, volume.x, volume.y, 0.19, 0, 0, volume.inclinacao))
   }
 
   const { grupo: diario, materialCapa: materialDiario } = criarDiarioFisico()
-  diario.position.set(-1.7, 1.43, -1.61)
+  diario.position.set(-0.07, 1.43, 0.21)
   diario.rotation.z = -0.075
   diario.rotation.y = -0.035
   diario.userData = { tipo: "diario", ref: refDiario }
-  scene.add(diario)
+  estanteMovel.add(diario)
   interativos.push(diario)
+
+  const materialDino = new THREE.MeshStandardMaterial({ color: 0x71846a, emissive: 0x314b36, emissiveIntensity: 0.1, roughness: 0.7 })
+  const dino = criarMiniDino(materialDino)
+  dino.position.set(-0.32, 1.62, 0.18)
+  dino.rotation.y = 0.28
+  dino.userData = { tipo: "dino", ref: refDino }
+  estanteMovel.add(dino)
+  interativos.push(dino)
+  scene.add(estanteMovel)
+
   let tempoDiario = 0
-  obstaculos.push(caixa(-1.63, -1.82, 1.2, 0.42))
+  let dinoAcionado = false
+  let deslocamentoEstante = 0
+  let portaDinoLiberada = false
+  const deslocamentoMaximo = 1.16
+  const colisorEstante = caixa(-1.63, -1.82, 1.2, 0.42)
+  obstaculos.push(colisorEstante)
+
+  const portaSecreta = criarPorta(0.78, 1.92)
+  portaSecreta.position.set(-1.63, 0, -mz + 0.086)
+  portaSecreta.userData = { tipo: "porta", ref: refPortaDino }
+  scene.add(portaSecreta)
+  const luzSecreta = new THREE.PointLight(0x7eb58c, 0, 2.5, 2)
+  luzSecreta.position.set(-1.63, 1.25, -mz + 0.34)
+  scene.add(luzSecreta)
 
   // Porta fechada e quadro de protocolo: elementos estáticos, sem competir
   // com o único alvo interativo.
@@ -230,9 +280,32 @@ export function construirSalaFinal(scene, ctx = {}) {
   scene.add(mesh(new THREE.BoxGeometry(0.045, 1.18, 1.45), metalEscuro, mx - 0.09, 1.48, -0.55))
   const aviso = mesh(new THREE.PlaneGeometry(1.03, 0.72), papel, mx - 0.116, 1.48, -0.55, 0, -Math.PI / 2)
   scene.add(aviso)
-  for (let i = 0; i < 5; i++) {
+  const linhasRegistro = Math.max(2, Math.min(7, 2 + Math.floor(analisados / 2)))
+  for (let i = 0; i < linhasRegistro; i++) {
     scene.add(mesh(new THREE.BoxGeometry(0.006, 0.012, 0.7 - i * 0.07), tinta, mx - 0.124, 1.68 - i * 0.09, -0.55))
   }
+  if (analisados >= 8) manifestacoes.push("registro:denso")
+  if (combinacoes.protocoloFrio) {
+    const gota = new THREE.MeshStandardMaterial({ color: 0xb2ced0, roughness: 0.1, transparent: true, opacity: 0.42 })
+    for (let i = 0; i < 5; i++) scene.add(mesh(new THREE.SphereGeometry(0.018, 7, 6), gota, mx - 0.128, 1.25 + i * 0.11, -0.82 + (i % 2) * 0.28))
+    manifestacoes.push("rara:protocoloFrio")
+  }
+  if (combinacoes.mesaObservada) {
+    const lente = new THREE.MeshStandardMaterial({ color: 0x1b2220, emissive: 0x547269, emissiveIntensity: 0.32, roughness: 0.22, metalness: 0.5 })
+    scene.add(mesh(new THREE.RingGeometry(0.035, 0.052, 18), lente, 0.66, 0.71, -0.44, -Math.PI / 2))
+    manifestacoes.push("rara:mesaObservada")
+  }
+
+  const reconstrucao = criarReconstrucao({
+    eventos: ctx.sessao?.eventos || [],
+    vestigios,
+    rota: ctx.rotaFinalId,
+  })
+  reconstrucao.grupo.position.set(1.62, 0, -1.12)
+  reconstrucao.grupo.rotation.y = -0.12
+  scene.add(reconstrucao.grupo)
+  interativos.push(reconstrucao.interativo)
+  obstaculos.push(caixa(1.62, -1.12, 0.92, 0.64))
 
   // O dossiê continua sendo o alvo principal no centro da composição.
   const dossie = criarDossie({ pasta, papel, tinta, metal }, vestigios, ctx.rotaFinalId)
@@ -245,7 +318,16 @@ export function construirSalaFinal(scene, ctx = {}) {
   // Luz institucional envelhecida, com foco discreto no documento.
   scene.add(new THREE.AmbientLight(0x4e4d48, 0.58))
   scene.add(new THREE.HemisphereLight(0x8f9896, 0x2b2925, 0.54))
-  const teto = new THREE.PointLight(0xe4dbc5, 5.2, 6.2, 1.85)
+  const corLuzPredominante = {
+    corte: 0xe1c7bc,
+    frio: 0xc5dde0,
+    ausencia: 0xc9d0cc,
+    observacao: 0xd2ddd8,
+    domestico: 0xe7d0ad,
+    registro: 0xd7d1bd,
+    ordem: 0xddd9c6,
+  }[predominante] || 0xe4dbc5
+  const teto = new THREE.PointLight(corLuzPredominante, 4.9 + Math.min(analisados, 12) * 0.035, 6.2, 1.85)
   teto.position.set(0, 2.42, 0.18)
   teto.castShadow = true
   teto.shadow.mapSize.set(512, 512)
@@ -261,6 +343,18 @@ export function construirSalaFinal(scene, ctx = {}) {
   scene.add(foco)
   scene.add(foco.target)
 
+  if (predominante) manifestacoes.push(`vestigio:${predominante}`)
+  if (combinacoes.ordemInterrompida) manifestacoes.push("rara:ordemInterrompida")
+
+  function ativarDino() {
+    if (dinoAcionado) return false
+    dinoAcionado = true
+    materialDino.emissiveIntensity = 0.85
+    dino.rotation.z = -0.12
+    manifestacoes.push("acesso:dino")
+    return true
+  }
+
   return {
     id: "salaFinal",
     data,
@@ -270,9 +364,31 @@ export function construirSalaFinal(scene, ctx = {}) {
     spawn: { x: 0.92, y: 1.65, z: 1.78, olharY: 0.42 },
     fonteSom: { x: -0.2, y: 2.56, z: 0.18 },
     limites: { peDireito: PE_DIREITO },
+    manifestacoes,
+    reconstrucao,
+    ativarDino,
     atualizar(delta) {
       tempoDiario += delta
       materialDiario.emissiveIntensity = 0.035 + (Math.sin(tempoDiario * 1.45) + 1) * 0.022
+      reconstrucao.atualizar(delta)
+      if (combinacoes.ordemInterrompida) {
+        const ciclo = tempoDiario % 7.5
+        calha.emissiveIntensity = ciclo > 6.92 && ciclo < 7.02 ? 0.18 : 1.6
+      }
+      if (!dinoAcionado) return
+
+      deslocamentoEstante = Math.min(deslocamentoMaximo, deslocamentoEstante + delta * 0.34)
+      const suavizado = deslocamentoEstante / deslocamentoMaximo
+      const deslocamento = deslocamentoMaximo * (1 - Math.pow(1 - suavizado, 3))
+      estanteMovel.position.x = -1.63 + deslocamento
+      colisorEstante.minX = -1.63 + deslocamento - 0.6
+      colisorEstante.maxX = -1.63 + deslocamento + 0.6
+      luzSecreta.intensity = Math.max(0, (deslocamento - 0.28) * 2.4)
+      materialDino.emissiveIntensity = 0.32 + (Math.sin(tempoDiario * 4.2) + 1) * 0.18
+      if (deslocamentoEstante >= 1.08 && !portaDinoLiberada) {
+        portaDinoLiberada = true
+        interativos.push(portaSecreta)
+      }
     },
   }
 }

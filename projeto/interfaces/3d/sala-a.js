@@ -101,6 +101,7 @@ export function construirSalaA(scene, ctx = {}) {
   const refs = Object.fromEntries(data.objetos.map((objeto) => [objeto.id, objeto]))
   const interativos = []
   const obstaculos = []
+  const manifestacoes = []
 
   const metalParede = materialMetal(0x606b6f, 0.67)
   const metalPiso = materialMetal(0x424a4d, 0.78)
@@ -222,7 +223,8 @@ export function construirSalaA(scene, ctx = {}) {
 
   const ferramenta = criarFerramenta(metalAco, escuro)
   ferramenta.position.set(0.18, 0.02, 1.92)
-  ferramenta.rotation.y = -0.42
+  ferramenta.rotation.y = intensidade(vestigios, "ordem") >= 3 ? -0.14 : -0.42
+  if (intensidade(vestigios, "ordem") >= 3) manifestacoes.push("ferramenta:alinhada")
   ferramenta.userData = { tipo: "objeto", ref: refs.ferramenta }
   scene.add(ferramenta)
   interativos.push(ferramenta)
@@ -230,6 +232,7 @@ export function construirSalaA(scene, ctx = {}) {
   const trilha = criarTrilha(corte)
   if (intensidade(vestigios, "ausencia") >= 3 && trilha.children[6]) {
     trilha.children[6].visible = false
+    manifestacoes.push("trilha:interrompida")
   }
   trilha.userData = { tipo: "objeto", ref: refs.trilha }
   scene.add(trilha)
@@ -261,6 +264,15 @@ export function construirSalaA(scene, ctx = {}) {
     scene.add(luz)
     scene.add(mesh(new THREE.BoxGeometry(0.72, 0.035, 0.12), emissivo, i === 1 ? 0.55 : 0, 2.46, z))
   }
+  if (intensidade(vestigios, "domestico") >= 3) {
+    const residuo = new THREE.PointLight(0xd4a36f, 0.42, 1.35, 2)
+    residuo.position.set(bancadaX, 0.72, 0.42)
+    scene.add(residuo)
+    manifestacoes.push("bancada:calor-residual")
+  }
+  if (intensidade(vestigios, "frio") >= 2) manifestacoes.push("placa:condensacao")
+  if (intensidade(vestigios, "observacao") >= 2) manifestacoes.push("placa:fixacao")
+  if (combinacoes.reflexoCortado) manifestacoes.push("rara:reflexoCortado")
 
   return {
     id: "salaA",
@@ -273,5 +285,6 @@ export function construirSalaA(scene, ctx = {}) {
     // mas o jogo nunca afirma que uma coisa causa a outra.
     fonteSom: { x: LARGURA / 2 + 0.22, y: 1.18, z: 0.38 },
     limites: { peDireito: PE_DIREITO },
+    manifestacoes,
   }
 }

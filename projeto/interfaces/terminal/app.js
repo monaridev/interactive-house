@@ -278,6 +278,10 @@
         const destino = typeof obj.proxima === "function"
           ? obj.proxima(clicados, Estado.snapshotGlobal())
           : obj.proxima;
+        const clusterDestino = data.salas[destino] && data.salas[destino].cluster;
+        if (clusterDestino) Estado.registrarRota(destino, clusterDestino, "porta-terminal", salaId);
+        if (destino === "relatorioApressado") Estado.registrarRota("apressado", null, "ausencia-de-interacao", salaId);
+        Estado.registrarTransicao(salaId, destino, obj.id);
         if (destino === "relatorio") renderRelatorio(salaId);
         else if (destino === "relatorioApressado") renderRelatorio("apressado");
         else renderSala(destino);

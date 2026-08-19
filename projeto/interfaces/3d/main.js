@@ -26,7 +26,9 @@ import { construirSalaB } from "./sala-b.js"
 import { construirSalaC } from "./sala-c.js"
 import { construirSalaD } from "./sala-d.js"
 import { construirSalaFinal } from "./sala-final.js"
+import { construirSalaDino } from "./sala-dino.js"
 import { criarLeitorDiario } from "./diario.js"
+import { criarModoTecnico } from "./modo-tecnico.js"
 import { criarSistemaReacoes } from "./reacoes.js"
 import { resolverMovimento, desencaixar } from "./colisao.js"
 import { variacaoDossie } from "./vestigios.js"
@@ -44,15 +46,18 @@ const SALAS_3D = {
   salaC: construirSalaC,
   salaD: construirSalaD,
   salaFinal: construirSalaFinal,
+  salaDino: construirSalaDino,
 }
 
 // ---------- cena ----------
 const scene = new THREE.Scene()
-scene.background = new THREE.Color(0x08080a)
+const FUNDO_PADRAO = 0x08080a
+const NEVOA_PADRAO = { cor: 0x08080a, densidade: 0.075 }
+scene.background = new THREE.Color(FUNDO_PADRAO)
 // Neblina fraca: a Cozinha tem 4m, então não é pra "esconder
 // distância" — é pra que o canto mais longe da bancada perca um pouco
 // de definição. Serve pro Corredor também: ele é ainda mais estreito.
-scene.fog = new THREE.FogExp2(0x08080a, 0.075)
+scene.fog = new THREE.FogExp2(NEVOA_PADRAO.cor, NEVOA_PADRAO.densidade)
 
 const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.04, 40)
 
@@ -108,6 +113,7 @@ let grupoSalaAtual = null // tudo que a sala pôs na cena, num Group só
 const controls = new PointerLockControls(camera, renderer.domElement)
 const capa = document.getElementById("capa")
 let leituraAberta = false
+let modoTecnico = null
 capa.addEventListener("click", () => controls.lock())
 controls.addEventListener("lock", () => capa.classList.add("oculto"))
 controls.addEventListener("unlock", () => {
@@ -266,7 +272,7 @@ function iniciarAudio() {
     oscilador.start()
   }
 
-  audio = { context, panner }
+  audio = { context, panner, filtro, ganho }
   atualizarFonteAudio()
 }
 
@@ -276,6 +282,15 @@ function atualizarFonteAudio() {
   audio.panner.positionX.value = x
   audio.panner.positionY.value = y
   audio.panner.positionZ.value = z
+  const vestigios = Estado.snapshotVestigios()
+  const frio = vestigios.tipos.frio || 0
+  const ausencia = vestigios.tipos.ausencia || 0
+  const registro = vestigios.tipos.registro || 0
+  const ordem = vestigios.tipos.ordem || 0
+  const volume = 0.03 + Math.min(ausencia, 7) * 0.0012 + Math.min(registro, 6) * 0.0008
+  const corte = Math.max(125, 180 + ordem * 4 - frio * 5)
+  audio.ganho.gain.setTargetAtTime(volume, audio.context.currentTime, 0.18)
+  audio.filtro.frequency.setTargetAtTime(corte, audio.context.currentTime, 0.22)
 }
 
 function atualizarOuvinte() {
@@ -307,6 +322,19 @@ const CLUSTER_LABEL = { corte: "Corte", domestico: "Doméstico", vazio: "Vazio",
 const REGISTRO_ID = { salaA: "41-A", salaB: "41-B", salaC: "41-C", salaD: "41-D" }
 const SALAS_DESFECHO = new Set(["salaA", "salaB", "salaC", "salaD"])
 let rotaFinalId = null
+
+function clusterParcial() {
+  const clicados = Estado.clicadosDe("cozinha")
+  if (!clicados.size) return null
+  const contagens = Object.fromEntries(Object.entries(CLUSTERS).map(([id, cluster]) => [id, cluster.objetos.filter((objeto) => clicados.has(objeto)).length]))
+  const maior = Math.max(...Object.values(contagens))
+  const empatados = Object.keys(contagens).filter((id) => contagens[id] === maior)
+  for (const objeto of [...clicados].reverse()) {
+    const cluster = empatados.find((id) => CLUSTERS[id].objetos.includes(objeto))
+    if (cluster) return cluster
+  }
+  return empatados[0] || null
+}
 
 function digitarTexto(elemento, texto, velocidade, aoTerminar) {
   elemento.textContent = ""
@@ -380,6 +408,7 @@ function mostrarRelatorio(salaFinalId) {
 // O overlay cobre a tela inteira, então cliques não voltam a alcançar o
 // canvas por baixo.
 function encerrarExperiencia(salaFinalId) {
+  Estado.registrarEvento("encerramento", { sala: sala?.id || null, rota: salaFinalId })
   leituraAberta = true
   controls.unlock()
   outlinePass.selectedObjects = []
@@ -481,6 +510,7 @@ function abrirDossie() {
   }
 
   leituraAberta = true
+  Estado.registrarEvento("consulta_dossie", { sala: "salaFinal", rota: rotaFinalId })
   Object.keys(teclas).forEach((k) => (teclas[k] = false))
   outlinePass.selectedObjects = []
   clearTimeout(temporizadorHud)
@@ -520,6 +550,7 @@ const leitorDiario = criarLeitorDiario({
 function abrirDiario() {
   if (leituraAberta) return
   leituraAberta = true
+  Estado.registrarEvento("consulta_diario", { sala: "salaFinal", objeto: "diario" })
   Object.keys(teclas).forEach((k) => (teclas[k] = false))
   outlinePass.selectedObjects = []
   clearTimeout(temporizadorHud)
@@ -576,17 +607,25 @@ function limparSala() {
 // como a porta do Corredor, sem que a sala precise conhecer `Estado`
 // diretamente. Ela só recebe um número pelo `ctx`.
 function entrarEm(id) {
+  if (!SALAS_3D[id]) return false
   reacoes.limpar()
   limparSala()
   grupoSalaAtual = new THREE.Group()
   scene.add(grupoSalaAtual)
 
   const visita = Estado.contarVisitas(id)
+  Estado.registrarVisita(id)
   sala = SALAS_3D[id](grupoSalaAtual, {
     visita,
     vestigios: Estado.snapshotVestigios(),
     rotaFinalId,
+    sessao: Estado.snapshotSessao(),
   })
+
+  const ambiente = sala.ambiente || {}
+  scene.background.set(ambiente.fundo ?? FUNDO_PADRAO)
+  scene.fog.color.set(ambiente.nevoa?.cor ?? NEVOA_PADRAO.cor)
+  scene.fog.density = ambiente.nevoa?.densidade ?? NEVOA_PADRAO.densidade
 
   camera.position.set(sala.spawn.x, sala.spawn.y, sala.spawn.z)
   camera.rotation.set(0, sala.spawn.olharY, 0) // zera inclinação de cabeça herdada da sala anterior
@@ -594,9 +633,10 @@ function entrarEm(id) {
   camera.position.x = pos.x
   camera.position.z = pos.z
 
-  Estado.registrarVisita(sala.id)
+  Estado.registrarManifestacoes(sala.id, sala.manifestacoes)
   atualizarFonteAudio()
   escrever(sala.data.titulo.toUpperCase(), descreverSala())
+  return true
 }
 
 entrarEm("cozinha")
@@ -614,6 +654,8 @@ function atualizarContorno() {
     ultimoAlvoHover = alvo
     if (alvo?.userData?.tipo === "dossie") escrever(alvo.userData.ref.nome.toUpperCase(), alvo.userData.ref.fala)
     if (alvo?.userData?.tipo === "diario") escrever(alvo.userData.ref.nome.toUpperCase(), alvo.userData.ref.fala)
+    if (alvo?.userData?.tipo === "reconstrucao") escrever(alvo.userData.ref.nome.toUpperCase(), alvo.userData.ref.fala)
+    if (alvo?.userData?.tipo === "dino") escrever(alvo.userData.ref.nome.toUpperCase(), alvo.userData.ref.fala)
   }
 }
 
@@ -641,6 +683,7 @@ function easeOutQuad(p) {
 
 function iniciarTransicao(destino) {
   if (transicao) return // clique duplo durante a transição: ignora
+  Estado.registrarTransicao(sala?.id || null, destino, "porta")
   camera.getWorldDirection(direcaoPasso)
   direcaoPasso.y = 0
   direcaoPasso.normalize()
@@ -683,6 +726,21 @@ renderer.domElement.addEventListener("click", () => {
     return
   }
 
+  if (tipo === "reconstrucao") {
+    Estado.registrarEvento("reconstrucao_iniciada", { sala: sala.id, objeto: ref.id, eventosFonte: sala.reconstrucao?.passos || 0 })
+    sala.reconstrucao?.iniciar()
+    escrever("REGISTRO DE CAMPO", "Sequência recuperada.")
+    return
+  }
+
+  if (tipo === "dino") {
+    if (sala.ativarDino?.()) {
+      Estado.registrarEvento("acesso_revelado", { sala: sala.id, objeto: ref.id, destino: "salaDino" })
+      escrever("MINIATURA", "O mecanismo responde sem emitir confirmação.")
+    }
+    return
+  }
+
   if (tipo === "objeto") {
     Estado.registrarClique(sala.id, ref.id, ref.vestigios)
     if (sala.id === "cozinha") reacoes.disparar(alvo, ref.id)
@@ -704,15 +762,24 @@ renderer.domElement.addEventListener("click", () => {
         : ref.proxima
     console.log(`[3d] destino calculado: ${destino}`)
 
+    if (SALAS_DESFECHO.has(destino)) {
+      rotaFinalId = destino
+      Estado.registrarRota(destino, DATA.salas[destino]?.cluster, sala.id === "cozinha" ? "porta-cozinha" : "porta", sala.id)
+    }
+
     if (destino === "relatorio" && SALAS_DESFECHO.has(sala.id)) {
       // dados.js continua com "relatorio" para preservar o terminal 2D.
       // Na experiência 3D, esse destino passa pela Sala Final e guarda a
       // origem para preencher o dossiê dinâmico.
       rotaFinalId = sala.id
+      Estado.registrarRota(sala.id, DATA.salas[sala.id]?.cluster, "sala-desfecho", sala.id)
       iniciarTransicao("salaFinal")
     } else if (destino === "relatorio") {
+      Estado.registrarTransicao(sala.id, "relatorio", ref.id)
       encerrarExperiencia(sala.id)
     } else if (destino === "relatorioApressado") {
+      Estado.registrarRota("apressado", null, "ausencia-de-interacao", sala.id)
+      Estado.registrarTransicao(sala.id, "relatorioApressado", ref.id)
       encerrarExperiencia("apressado")
     } else if (SALAS_3D[destino]) {
       iniciarTransicao(destino)
@@ -744,6 +811,8 @@ if (new URLSearchParams(location.search).get("apresentacao") === "1") {
     Numpad6: "salaD",
     Digit7: "salaFinal",
     Numpad7: "salaFinal",
+    Digit8: "salaDino",
+    Numpad8: "salaDino",
   }
 
   function irParaSalaApresentacao(id) {
@@ -754,6 +823,7 @@ if (new URLSearchParams(location.search).get("apresentacao") === "1") {
     // sem escolha anterior, A fornece um conteúdo válido e previsível.
     if (SALAS_DESFECHO.has(id)) rotaFinalId = id
     if (id === "salaFinal" && !SALAS_DESFECHO.has(rotaFinalId)) rotaFinalId = "salaA"
+    if (SALAS_DESFECHO.has(rotaFinalId)) Estado.registrarRota(rotaFinalId, DATA.salas[rotaFinalId]?.cluster, "apresentacao", sala?.id)
 
     Object.keys(teclas).forEach((k) => (teclas[k] = false))
     outlinePass.selectedObjects = []
@@ -765,10 +835,22 @@ if (new URLSearchParams(location.search).get("apresentacao") === "1") {
     location.reload()
   }
 
+  function reconstruirApresentacao() {
+    if (leituraAberta || transicao) return false
+    if (sala.id !== "salaFinal") irParaSalaApresentacao("salaFinal")
+    sala.reconstrucao?.iniciar()
+    Estado.registrarEvento("reconstrucao_iniciada", { sala: "salaFinal", objeto: "atalho-apresentacao", eventosFonte: sala.reconstrucao?.passos || 0 })
+    return true
+  }
+
   addEventListener("keydown", (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
     if (e.code === "KeyR") {
       resetarApresentacao()
+      return
+    }
+    if (e.code === "KeyL") {
+      reconstruirApresentacao()
       return
     }
     const destino = ATALHOS_APRESENTACAO[e.code]
@@ -791,12 +873,46 @@ if (new URLSearchParams(location.search).get("apresentacao") === "1") {
     "letter-spacing:.04em",
     "pointer-events:none",
   ].join(";")
-  indicador.textContent = "MODO APRESENTAÇÃO · 1 Cozinha · 2 Corredor · 3–6 Salas A–D · 7 Sala Final · R Reset"
+  indicador.textContent = "MODO APRESENTAÇÃO · 1–7 Salas · 8 Dino · L Reconstrução · T Técnico · R Reset"
   document.body.append(indicador)
+
+  modoTecnico = criarModoTecnico({
+    podeAbrir: () => !leituraAberta,
+    obterSnapshot() {
+      const sessao = Estado.snapshotSessao()
+      const cluster = clusterParcial()
+      return {
+        sala: sala?.id,
+        objetosAnalisados: Estado.contarCliques("cozinha"),
+        cluster: cluster ? CLUSTER_LABEL[cluster] || cluster : null,
+        rota: rotaFinalId || sessao.rota?.rota || null,
+        vestigios: sessao.vestigios.tipos,
+        eventos: sessao.eventos,
+        reconstrucao: sala?.reconstrucao?.ativo ? "em execução" : sala?.id === "salaFinal" ? "pronta" : "disponível na Sala Final",
+      }
+    },
+    aoAbrir() {
+      leituraAberta = true
+      Object.keys(teclas).forEach((k) => (teclas[k] = false))
+      outlinePass.selectedObjects = []
+      clearTimeout(temporizadorHud)
+      hud.classList.remove("visivel")
+      controls.unlock()
+      capa.classList.add("oculto")
+    },
+    aoFechar() {
+      leituraAberta = false
+      Object.keys(teclas).forEach((k) => (teclas[k] = false))
+      capa.classList.remove("oculto")
+      controls.lock()
+    },
+  })
 
   window.__apresentacao = {
     ir: irParaSalaApresentacao,
     resetar: resetarApresentacao,
+    reconstruir: reconstruirApresentacao,
+    tecnico: modoTecnico,
   }
 }
 
@@ -817,6 +933,12 @@ if (new URLSearchParams(location.search).has("inspecao")) {
     },
     abrirDossie,
     abrirDiario,
+    reconstruir() {
+      return sala?.reconstrucao?.iniciar()
+    },
+    revelarDino() {
+      return sala?.ativarDino?.()
+    },
     olhar(de, para) {
       camera.position.set(de[0], de[1], de[2])
       camera.lookAt(para[0], para[1], para[2])
@@ -846,6 +968,7 @@ function animar() {
   }
   reacoes.atualizar(delta)
   sala.atualizar?.(delta)
+  modoTecnico?.atualizar()
   atualizarOuvinte()
   composer.render()
 }

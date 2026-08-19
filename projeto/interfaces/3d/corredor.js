@@ -68,6 +68,7 @@ export function construirCorredor(scene, ctx = {}) {
   const ordem = Math.min(intensidade(vestigios, "ordem"), 6)
   const obstaculos = []
   const interativos = []
+  const manifestacoes = []
 
   const salaData = window.DATA.salas.corredor
   const porta = salaData.objetos.find((o) => o.ehSaida)
@@ -212,6 +213,13 @@ export function construirCorredor(scene, ctx = {}) {
     { p: pontoNoTrecho(P1, ANGULO_2, 1.58), a: ANGULO_2 },
   ]
   estruturas.forEach(({ p, a }, i) => pórtico(p, a, i + ordem))
+  if (intensidade(vestigios, "registro") >= 2) {
+    const placaInvertida = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.012), matSinal)
+    placaInvertida.position.set(P1.x - 0.43, 1.62, P1.z + 0.31)
+    placaInvertida.rotation.set(0, ANGULO_2, Math.PI)
+    scene.add(placaInvertida)
+    manifestacoes.push("placa:invertida")
+  }
 
   function trilho(a, b, angulo) {
     const comprimento = Math.hypot(b.x - a.x, b.z - a.z)
@@ -345,6 +353,7 @@ export function construirCorredor(scene, ctx = {}) {
     )
     olho.position.set(-0.12, 1.55, 0.028)
     portaSaida.add(olho)
+    manifestacoes.push("porta:lente")
   }
   scene.add(portaSaida)
   interativos.push(portaSaida)
@@ -376,6 +385,15 @@ export function construirCorredor(scene, ctx = {}) {
     apoio.position.set(p.x, PE_DIREITO - 0.2, p.z)
     scene.add(apoio)
   }
+  if (intensidade(vestigios, "domestico") >= 3) {
+    const calorResidual = new THREE.PointLight(0xc39a6c, 0.38, 1.5, 2)
+    calorResidual.position.set(P0.x, 1.35, P0.z + 0.72)
+    scene.add(calorResidual)
+    manifestacoes.push("entrada:calor-residual")
+  }
+  if (frio >= 2) manifestacoes.push("trilho:frio")
+  if (ausencia >= 3) manifestacoes.push("trilho:interrompido")
+  if (ordem >= 3) manifestacoes.push("porta:estavel")
 
   return {
     id: "corredor",
@@ -396,5 +414,6 @@ export function construirCorredor(scene, ctx = {}) {
       z: P1.z + 0.18 + ausencia * 0.012,
     },
     limites: { peDireito: PE_DIREITO },
+    manifestacoes,
   }
 }

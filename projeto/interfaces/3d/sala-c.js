@@ -34,8 +34,10 @@ export function construirSalaC(scene, ctx = {}) {
   const refs = Object.fromEntries(data.objetos.map((objeto) => [objeto.id, objeto]))
   const obstaculos = []
   const interativos = []
+  const manifestacoes = []
   const mx = LARGURA / 2
   const mz = COMPRIMENTO / 2
+  const intensidadeFrio = Math.min(intensidade(vestigios, "frio"), 5)
 
   const concreto = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 3), color: 0xa0adb0, roughness: 0.94 })
   const concretoEscuro = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 2), color: 0x667276, roughness: 1 })
@@ -127,8 +129,9 @@ export function construirSalaC(scene, ctx = {}) {
   for (const x of [-0.63, 0.63]) for (const z of [-1.72, -0.88]) {
     tetoAlvo.add(mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.055, 8), junta, x, PE_DIREITO - 0.13, z))
   }
-  for (let i = 0; i < 12; i++) {
-    const gota = mesh(new THREE.SphereGeometry(0.022 + (i % 3) * 0.006, 7, 6), umidade, -0.62 + (i % 4) * 0.4, PE_DIREITO - 0.08 - (i % 2) * 0.025, -1.65 + Math.floor(i / 4) * 0.36)
+  for (let i = 0; i < 12 + intensidadeFrio * 2; i++) {
+    const camada = Math.floor(i / 12)
+    const gota = mesh(new THREE.SphereGeometry(0.022 + (i % 3) * 0.006, 7, 6), umidade, -0.62 + (i % 4) * 0.4 + camada * 0.035, PE_DIREITO - 0.08 - (i % 2) * 0.025, -1.65 + (Math.floor(i / 4) % 3) * 0.36 + camada * 0.025)
     gota.scale.y = 1.65
     tetoAlvo.add(gota)
   }
@@ -150,6 +153,7 @@ export function construirSalaC(scene, ctx = {}) {
   if (intensidade(vestigios, "domestico") >= 3) {
     const seco = new THREE.MeshStandardMaterial({ color: 0x788183, roughness: 1, transparent: true, opacity: 0.36 })
     scene.add(mesh(new THREE.PlaneGeometry(0.92, 0.54), seco, 1.05, 0.014, -0.18, -Math.PI / 2, 0, 0.02))
+    manifestacoes.push("piso:area-seca")
   }
 
   if (combinacoes.horaCondensada) {
@@ -166,6 +170,7 @@ export function construirSalaC(scene, ctx = {}) {
       gota.scale.x = 0.45
       scene.add(gota)
     }
+    manifestacoes.push("rara:horaCondensada")
   }
 
   const porta = criarPorta(portaL - 0.06, portaA - 0.04)
@@ -176,7 +181,7 @@ export function construirSalaC(scene, ctx = {}) {
 
   scene.add(new THREE.HemisphereLight(0xb8cdd2, 0x303b3f, 0.88))
   scene.add(new THREE.AmbientLight(0x46565b, 0.62))
-  const luzFria = new THREE.SpotLight(0xc4dce0, 6.2, 6.5, Math.PI / 4.2, 0.68, 1.8)
+  const luzFria = new THREE.SpotLight(0xc4dce0, 6.2 + intensidadeFrio * 0.13, 6.5, Math.PI / 4.2, 0.68, 1.8)
   luzFria.position.set(-1.35, 2.35, -0.95)
   luzFria.target.position.set(0.78, 0, 0.62)
   luzFria.castShadow = true
@@ -195,6 +200,9 @@ export function construirSalaC(scene, ctx = {}) {
   recorte.position.set(1.45, 2.35, 2.4)
   recorte.target.position.set(-0.25, 0.8, -0.45)
   scene.add(recorte, recorte.target)
+  if (intensidadeFrio >= 2) manifestacoes.push("teto:condensacao-intensa")
+  if (intensidade(vestigios, "corte") >= 2) manifestacoes.push("parede:linha")
+  if (intensidade(vestigios, "registro") >= 2) manifestacoes.push("parede:etiqueta")
 
   return {
     id: "salaC",
@@ -205,5 +213,6 @@ export function construirSalaC(scene, ctx = {}) {
     spawn: { x: 0.9, y: 1.65, z: 2.35, olharY: 0.34 },
     fonteSom: { x: -mx - 0.28, y: 1.15, z: -0.72 },
     limites: { peDireito: PE_DIREITO },
+    manifestacoes,
   }
 }

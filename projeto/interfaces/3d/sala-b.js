@@ -67,6 +67,7 @@ export function construirSalaB(scene, ctx = {}) {
   const refs = Object.fromEntries(data.objetos.map((objeto) => [objeto.id, objeto]))
   const obstaculos = []
   const interativos = []
+  const manifestacoes = []
 
   const parede = new THREE.MeshStandardMaterial({ map: TEX.parede(2, 2), color: 0x8b806f, roughness: 0.94 })
   const piso = new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(3, 4), color: 0x665845, roughness: 0.86 })
@@ -167,8 +168,12 @@ export function construirSalaB(scene, ctx = {}) {
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     cadeiraPartes.push(mesh(new THREE.BoxGeometry(0.055, 0.46, 0.055), madeira, sx * 0.21, 0.23, sz * 0.18))
   }
-  interativos.push(alvo(scene, refs.cadeira, cadeiraPartes, -0.18, 0, -1.56, Math.PI))
-  obstaculos.push(caixa(-0.18, -1.56, 0.58, 0.58))
+  const cadeiraX = intensidade(vestigios, "ausencia") >= 3 ? -0.27 : -0.18
+  const cadeiraRotacao = Math.PI + (intensidade(vestigios, "ordem") >= 3 ? 0 : 0.11)
+  interativos.push(alvo(scene, refs.cadeira, cadeiraPartes, cadeiraX, 0, -1.56, cadeiraRotacao))
+  obstaculos.push(caixa(cadeiraX, -1.56, 0.58, 0.58))
+  if (cadeiraX !== -0.18) manifestacoes.push("cadeira:deslocada")
+  if (cadeiraRotacao === Math.PI) manifestacoes.push("cadeira:alinhada")
 
   // Copo de boca para baixo no lugar oposto ao da cadeira.
   const copoPartes = [
@@ -211,6 +216,11 @@ export function construirSalaB(scene, ctx = {}) {
     reflexoFrio.position.set(0.34, 1.02, 0.62)
     scene.add(reflexoFrio)
   }
+  if (intensidade(vestigios, "registro") >= 2) manifestacoes.push("mesa:ficha")
+  if (intensidade(vestigios, "corte") >= 2) manifestacoes.push("toalha:fibra")
+  if (intensidade(vestigios, "observacao") >= 2) manifestacoes.push("copo:reflexo")
+  if (intensidade(vestigios, "frio") >= 2) manifestacoes.push("copo:luz-fria")
+  if (combinacoes.fibraMarcada) manifestacoes.push("rara:fibraMarcada")
 
   return {
     id: "salaB",
@@ -221,5 +231,6 @@ export function construirSalaB(scene, ctx = {}) {
     spawn: { x: 1.08, y: 1.65, z: 2.12, olharY: 0.42 },
     fonteSom: { x: -mx - 0.2, y: 0.8, z: -0.9 },
     limites: { peDireito: PE_DIREITO },
+    manifestacoes,
   }
 }

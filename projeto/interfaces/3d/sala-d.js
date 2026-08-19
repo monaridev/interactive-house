@@ -39,6 +39,7 @@ export function construirSalaD(scene, ctx = {}) {
   const refs = Object.fromEntries(data.objetos.map((objeto) => [objeto.id, objeto]))
   const obstaculos = []
   const interativos = []
+  const manifestacoes = []
   const mx = LARGURA / 2
   const mz = COMPRIMENTO / 2
 
@@ -108,7 +109,8 @@ export function construirSalaD(scene, ctx = {}) {
     const linha = Math.floor(i / 5)
     const z = -2.45 + (i % 5) * 1.2
     const xLocal = -PROF_PRATELEIRA * 0.48
-    const folha = mesh(pastaGeom, pasta, xLocal, 0.38 + linha * 0.46, z, 0, -Math.PI / 2, (i % 3 - 1) * 0.025)
+    const inclinacao = intensidade(vestigios, "ordem") >= 3 ? 0 : (i % 3 - 1) * 0.025
+    const folha = mesh(pastaGeom, pasta, xLocal, 0.38 + linha * 0.46, z, 0, -Math.PI / 2, inclinacao)
     estanteDir.add(folha)
     estanteDir.add(mesh(etiquetaGeom, papel, xLocal - 0.17, 0.41 + linha * 0.46, z, 0, -Math.PI / 2))
   }
@@ -116,7 +118,10 @@ export function construirSalaD(scene, ctx = {}) {
     const tecido = new THREE.MeshStandardMaterial({ map: TEX.tecido(), color: 0x746b5b, roughness: 0.98 })
     const dobra = mesh(new THREE.BoxGeometry(0.2, 0.018, 0.16), tecido, PROF_PRATELEIRA * 0.55, 1.15, 1.34, 0.08, Math.PI / 2, 0.12)
     estanteEsq.add(dobra)
+    manifestacoes.push("arquivo:tecido")
   }
+  if (slotAusente >= 0) manifestacoes.push("arquivo:slot-ausente")
+  if (intensidade(vestigios, "ordem") >= 3) manifestacoes.push("arquivo:alinhado")
   interativos.push(estanteEsq, estanteDir)
   obstaculos.push(
     caixa(-bancoX, 0, PROF_PRATELEIRA, COMPRIMENTO - 0.65),
@@ -171,6 +176,11 @@ export function construirSalaD(scene, ctx = {}) {
   const camera = new THREE.Group()
   camera.add(mesh(new THREE.BoxGeometry(0.28, 0.16, 0.18), metalEscuro, 0, 0, 0))
   camera.add(mesh(new THREE.CylinderGeometry(0.065, 0.075, 0.12, 16), vidro, 0, -0.015, 0.14, Math.PI / 2))
+  if (intensidade(vestigios, "observacao") >= 2) {
+    const reflexoLente = new THREE.MeshStandardMaterial({ color: 0x8fb5ad, emissive: 0x557f76, emissiveIntensity: 0.68, roughness: 0.16 })
+    camera.add(mesh(new THREE.CircleGeometry(0.035, 16), reflexoLente, 0, -0.015, 0.205))
+    manifestacoes.push("camera:reflexo")
+  }
   camera.add(mesh(new THREE.BoxGeometry(0.05, 0.28, 0.05), metal, 0, 0.2, -0.03, 0, 0, -0.3))
   camera.position.set(0.82, 2.18, 2.38)
   camera.rotation.y = -0.28
@@ -200,6 +210,9 @@ export function construirSalaD(scene, ctx = {}) {
   luzFicha.position.set(-0.45, 1.8, 1.15)
   luzFicha.target.position.set(0, 0.88, 0.72)
   scene.add(luzFicha, luzFicha.target)
+  if (intensidade(vestigios, "corte") >= 2) manifestacoes.push("ficha:risco")
+  if (intensidade(vestigios, "frio") >= 2) manifestacoes.push("ficha:gota")
+  if (combinacoes.fichaApagada) manifestacoes.push("rara:fichaApagada")
 
   return {
     id: "salaD",
@@ -210,5 +223,6 @@ export function construirSalaD(scene, ctx = {}) {
     spawn: { x: 0, y: 1.65, z: 3.0, olharY: 0 },
     fonteSom: { x: mx + 0.35, y: 1.05, z: -1.35 },
     limites: { peDireito: PE_DIREITO },
+    manifestacoes,
   }
 }

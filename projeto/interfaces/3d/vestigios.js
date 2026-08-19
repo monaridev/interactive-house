@@ -20,13 +20,36 @@ function ocorreuAntes(vestigios, primeira, segunda) {
   return a >= 0 && b >= 0 && a < b
 }
 
+function temTodas(vestigios, origens) {
+  return origens.every((origem) => temOrigem(vestigios, origem))
+}
+
+export function vestigioPredominante(vestigios) {
+  const entradas = Object.entries(vestigios?.tipos || {})
+  if (entradas.length === 0) return null
+  entradas.sort(([tipoA, valorA], [tipoB, valorB]) => valorB - valorA || tipoA.localeCompare(tipoB))
+  return entradas[0][0]
+}
+
 export function combinacoesRaras(vestigios, rota) {
   return {
     reflexoCortado: rota === "salaA" && ocorreuAntes(vestigios, "faca", "camera"),
     fibraMarcada: rota === "salaB" && ocorreuAntes(vestigios, "faca", "toalha"),
     horaCondensada: rota === "salaC" && ocorreuAntes(vestigios, "gelo", "relogio"),
     fichaApagada: rota === "salaD" && ocorreuAntes(vestigios, "mancha", "caderno"),
+    mesaObservada: temTodas(vestigios, ["camera", "pratovazio"]) && ocorreuAntes(vestigios, "camera", "pratovazio"),
+    protocoloFrio: temTodas(vestigios, ["etiqueta", "gelo"]) && ocorreuAntes(vestigios, "etiqueta", "gelo"),
+    ordemInterrompida:
+      temTodas(vestigios, ["tesoura", "garfo", "relogio"]) &&
+      ocorreuAntes(vestigios, "tesoura", "garfo") &&
+      ocorreuAntes(vestigios, "garfo", "relogio"),
   }
+}
+
+export function nomesCombinacoesAtivas(vestigios, rota) {
+  return Object.entries(combinacoesRaras(vestigios, rota))
+    .filter(([, ativa]) => ativa)
+    .map(([nome]) => nome)
 }
 
 export function variacaoDossie(vestigios, rota) {

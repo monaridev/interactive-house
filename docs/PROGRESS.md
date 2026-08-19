@@ -1065,3 +1065,62 @@ volume e direção do som espacial, leitura das luzes nas resoluções da
 apresentação e os fluxos completos de porta, final apressado, dossiê e Diário.
 O navegador automatizado não concedeu Pointer Lock, por isso áudio posicional
 e sensação de circulação ainda dependem dessa passagem manual.
+
+### 19/08/2026 — Sessão 28 (memória, reconstrução e observabilidade)
+
+A última evolução sistêmica antes da apresentação foi integrada sem substituir
+os fluxos existentes. O estado continua volátil e as salas continuam módulos
+independentes; a nova camada apenas registra e interpreta fatos semânticos da
+sessão.
+
+- **Log de sessão** (`core/estado.js`): entradas, primeiras e repetidas
+  interações, tempo relativo, objeto, Vestígios produzidos, transições, rota e
+  manifestações ambientais passam a compor uma linha do tempo clonável. Não
+  há captura de frames, câmera ou mouse, nem `localStorage`. A interface 2D
+  também registra rotas e transições sem mudar sua apresentação.
+- **Memória ambiental ampliada:** Corredor e Ambientes A–D ganharam novas
+  variações de alinhamento, luz, posição, condensação, marcas, fichas e som,
+  sempre derivadas dos Vestígios reais. Cada sala declara chaves internas das
+  manifestações aplicadas para o log e para observabilidade, sem expô-las ao
+  visitante.
+- **Sala Final convergente** (`sala-final.js`): rota, vestígio predominante,
+  densidade das interações e combinações incomuns alteram barra de inspeção,
+  temperatura da luz, documento, quadro, mobiliário e detalhes discretos antes
+  da consulta do dossiê.
+- **Reconstrução** (`reconstrucao.js`): um dispositivo físico na Sala Final
+  recupera o levantamento como mapa abstrato tridimensional. Nós, pulsos,
+  cores e marcadores são gerados deterministicamente a partir do event log até
+  a primeira chegada à Sala Final; interações repetidas aparecem como pulsos
+  menores, enquanto movimento contínuo e o desvio Dino não entram na
+  reconstrução. O dossiê permanece independente.
+- **Combinações incomuns:** as quatro combinações de rota existentes foram
+  preservadas. `mesaObservada`, `protocoloFrio` e `ordemInterrompida` acrescentam
+  detalhes na Sala Final e uma assinatura na reconstrução sem anúncio,
+  porcentagem ou conquista.
+- **Modo técnico** (`modo-tecnico.js`): somente em `?apresentacao=1`, `T`
+  abre/fecha uma ferramenta interna com o fluxo interação → estado → Vestígios
+  → decisão/cluster → rota → mundo → dossiê/reconstrução e dados reais da
+  sessão. O painel pausa a navegação e tenta retomar Pointer Lock ao fechar.
+- **Dino Tech:** uma miniatura discreta na estante da Sala Final aciona uma
+  reação curta e o deslocamento suave do móvel. O colisor acompanha a animação;
+  somente quando o acesso está livre a porta secreta entra no raycast.
+- **Sala Dino** (`sala-dino.js`): ambiente bônus independente, com vegetação
+  procedural, névoa, iluminação viva, identidade Dino Tech, aviso institucional
+  e porta segura de retorno. Não altera a rota nem o dossiê.
+- **Apresentação:** `8` abre a Sala Dino para QA, `L` inicia a reconstrução e
+  `T` alterna o modo técnico. Atalhos `1`–`7` e `R` foram preservados; no modo
+  normal nenhuma ferramenta nova é criada.
+
+**Validação realizada:** checkout local confirmado no mesmo commit da `main`
+remota antes das mudanças; sintaxe ES de todos os JavaScripts; imports locais;
+`git diff --check`; testes determinísticos do log, snapshots e combinações;
+carregamento WebGL; passagem pelos oito ambientes; Sala Final, reconstrução,
+Sala Dino e modo técnico renderizados; URL normal sem indicador, atalhos ou
+painel técnico. Nenhum commit ou push foi criado.
+
+**Validação manual restante:** Pointer Lock e áudio espacial em navegador real;
+alcance do dinossauro, do dispositivo e da porta revelada em movimento livre;
+colisão durante toda a abertura da estante; leitura das novas luzes nas telas
+da apresentação; sequência narrativa completa com diferentes ordens reais de
+interação; dossiê, Diário, final apressado e retorno da Sala Dino após uma
+sessão completa.
