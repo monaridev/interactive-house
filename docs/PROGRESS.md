@@ -1221,3 +1221,46 @@ volume do áudio já existente, leitura dos detalhes mais escuros do dinossauro 
 clique de retorno à Cozinha. Também vale reproduzir sessões reais de cada rota
 A–D para conferir a leitura das quatro trilhas na maquete sob a iluminação da
 Sala Final.
+
+### 19/08/2026 — Sessão 31 (passe final: segredo, estação e circulação Dino)
+
+O último passe foi concentrado nos quatro pontos pedidos, sem alterar event log,
+Vestígios, clusters, rotas, dossiê, Diário, modo técnico ou velocidade da
+reconstrução.
+
+- **Mini dino:** a estatueta recuou para o centro das quatro pernas do banco
+  leste, em `(-0,18; 0,64)` no plano da Cozinha. Continua invisível do spawn,
+  mas o raycast justo permanece confiável ao mirar deliberadamente sob o banco.
+- **Estação:** esferas de eventos foram removidas. Entradas usam cruzes
+  técnicas, interações usam chips, transições usam chevrons e a rota usa uma
+  moldura; um único pacote retangular percorre apenas conexões reais. O idle
+  agora reduz grade, conexões, rótulos, emissor e iluminação, enquanto a
+  ativação revela progressivamente os ambientes e os estágios. Rótulos
+  elevados identificam COZ, EIXO, A–D e FINAL sem depender de círculos.
+- **Sala Dino:** a planta passou de 4,6 × 5,0 m para 6,4 × 6,2 m. Canteiro,
+  passarela, pórtico, vidro, pedras, vegetação e luzes foram redistribuídos para
+  ocupar o volume maior sem fechar as laterais. As folgas visuais úteis são de
+  aproximadamente 1,05 m no lado da cauda e 1,22 m no lado da cabeça.
+- **Colisão:** o círculo central genérico do animal foi substituído por quatro
+  volumes sobre quadril, torso, peito e cabeça. A busca em grade de 10 cm com o
+  resolvedor real confirmou uma única região navegável e acesso, a partir do
+  spawn, aos lados esquerdo/direito e ao fundo do habitat.
+- **Dinossauro principal:** malhas de perfil receberam extremidades fechadas;
+  crânio e mandíbula ganharam contornos próprios, focinho afilado, órbitas
+  frontais e laterais, olhos estreitos, narinas angulares, boca fina e dentes
+  frontais. A textura perdeu manchas grandes e ganhou variação menor. Uma luz
+  frontal direcionada passou a separar o rosto, mantendo chave âmbar e recorte
+  ciano.
+
+**Validação realizada:** sintaxe de todos os JavaScripts; `git diff --check`;
+ausência de `SphereGeometry` na reconstrução; timing de 0,52 s preservado;
+render WebGL de Cozinha, estação idle/ativa/final e Sala Dino em entrada,
+frente, perfil e close; console limpo em aba nova; raycast do mini dino; guarda
+contra ativações repetidas; colisor móvel e porta secreta liberada; circulação
+pelos dois lados e pelo fundo com raio de jogador de 0,28 m.
+
+**Inspeção manual restante:** passagem completa com Pointer Lock no notebook da
+apresentação, especialmente sensação de largura ao contornar cabeça/cauda,
+leitura do rosto sob a exposição da tela real, volume do áudio e sequência de
+retorno Cozinha → Sala Dino → Cozinha. Também vale reproduzir rotas reais A–D
+para avaliar os pulsos e rótulos da estação com logs mais longos.

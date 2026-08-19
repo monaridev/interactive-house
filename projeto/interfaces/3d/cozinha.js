@@ -544,12 +544,12 @@ export function construirCozinha(scene) {
     obstaculos.push(cilindro(bancoPos.x, bancoPos.z, 0.19))
   }
 
-  // Easter egg quase sob o banco leste, no estreito intervalo entre assento e
-  // ilha. O banco e o corpo da ilha o ocluem do spawn; ele só aparece quando
-  // alguém contorna o móvel e deliberadamente olha para o chão entre as pernas.
+  // Easter egg sob o banco leste, recuado para o miolo das quatro pernas. O
+  // assento, as pernas e o corpo da ilha o ocluem do spawn; ainda aparece para
+  // quem contorna o móvel e deliberadamente inspeciona o chão sob o banco.
   const { grupo: miniDino, material: materialMiniDino } = criarMiniDino()
-  miniDino.position.set(-0.12, 0.012, 0.585)
-  miniDino.rotation.y = -0.24
+  miniDino.position.set(-0.18, 0.012, 0.64)
+  miniDino.rotation.y = -0.31
   miniDino.userData = { tipo: "dino", ref: refDino }
   scene.add(miniDino)
   interativos.push(miniDino)
