@@ -1124,3 +1124,100 @@ colisão durante toda a abertura da estante; leitura das novas luzes nas telas
 da apresentação; sequência narrativa completa com diferentes ordens reais de
 interação; dossiê, Diário, final apressado e retorno da Sala Dino após uma
 sessão completa.
+
+### 19/08/2026 — Sessão 29 (polimento e reposicionamento do easter egg Dino)
+
+O easter egg foi retirado da Sala Final e integrado à Cozinha sem alterar
+Vestígios, clusters, rota, dossiê, Diário, reconstrução ou modo técnico.
+
+- **Miniatura na Cozinha** (`cozinha.js`): o dinossauro agora é uma pequena
+  estatueta de resina no chão, entre a ilha e os bancos. Corpo, peito, cabeça,
+  focinho, olhos, braços, pernas, pés e cauda segmentada formam uma silhueta
+  mais clara; uma hitbox invisível e limitada preserva o raycast sem torná-lo
+  visualmente chamativo.
+- **Estante secreta integrada:** a estante doméstica existente virou o móvel
+  deslizante. Louças, marcas de poeira e os quatro objetos de registro passam a
+  acompanhá-la. Trilho, recesso e moldura permanecem discretos até a ativação;
+  o colisor acompanha o deslocamento e a porta só entra no raycast perto do
+  fim da abertura.
+- **Sala Final limpa** (`sala-final.js`): miniatura, porta secreta, luz e
+  animação do mecanismo foram removidas. A estante documental, o Diário, o
+  dossiê e a reconstrução foram preservados.
+- **Sala Dino recomposta** (`sala-dino.js`): ambiente menor, canteiro central,
+  vegetação agrupada, estrutura técnica, placa Dino Tech integrada, iluminação
+  quente/fria em camadas, névoa mais leve e novo terópode procedural com corpo,
+  pescoço, cabeça, mandíbula, braços, pernas, pés, garras, cauda e placas
+  dorsais melhor proporcionados. O retorno agora leva à Cozinha, origem do
+  acesso secreto.
+
+**Validação realizada:** sintaxe dos módulos alterados; `git diff --check`;
+render WebGL da Cozinha, mecanismo aberto, Sala Dino e Sala Final; ativação
+única (`true` na primeira chamada e `false` na repetição); porta secreta ausente
+do raycast antes e presente depois da abertura; raycast direto na miniatura;
+retorno apontando para a Cozinha; modo apresentação abrindo Sala Dino e Sala
+Final; console limpo em abas novas. O harness temporário foi removido.
+
+**Validação manual restante:** confirmar com Pointer Lock real o alcance da
+miniatura na altura normal da câmera, a colisão durante toda a animação, a
+aproximação da passagem e o clique da porta já revelada; percorrer a Sala Dino
+para calibrar luz, névoa e escala nas telas da apresentação; confirmar áudio e
+o retorno completo à Cozinha. O navegador automatizado continua sem conceder
+Pointer Lock.
+
+### 19/08/2026 — Sessão 30 (direção de arte final: segredo, habitat e reconstrução)
+
+Polimento concentrado nos três pontos ainda provisórios, usando o estado da
+Sessão 29 e preservando event log, Vestígios, clusters, rota, dossiê, Diário,
+modo técnico e timings determinísticos.
+
+- **Segredo realmente discreto:** a miniatura passou para o intervalo estreito
+  quase sob o banco leste, entre o assento e a ilha. Do spawn ela fica totalmente
+  ocluída; de perto, cabeça e cauda aparecem entre as pernas do banco. A peça
+  agora usa superfícies contínuas por perfis, acabamento de resina e hitbox que
+  acompanha seu volume. O raycast dá prioridade ao dino apenas quando essa
+  hitbox justa é realmente atravessada, evitando que o copo distante roube um
+  clique visível.
+- **Passagem sem denúncia antecipada:** o trilho inferior permanece invisível
+  antes do acionamento e surge com o início do deslocamento. A estante continua
+  movendo louças e objetos, o colisor acompanha o móvel e a porta só entra no
+  conjunto interativo após a abertura suficiente. Chamadas repetidas durante o
+  movimento seguem ignoradas.
+- **Herói da Sala Dino:** torso/cauda, pescoço/crânio, mandíbula, coxas, pernas,
+  pés e braços foram esculpidos como malhas suaves contínuas, com olhos
+  embutidos, boca, dentes, garras e textura de pele procedural determinística.
+  O ambiente ganhou habitat elíptico com aro técnico, pórtico de contenção,
+  vidro, passarela, vegetação em planos de profundidade e placa Dino Tech
+  integrada.
+- **Luz e atmosfera:** ambiente frio e controlado, chave âmbar sobre o animal,
+  preenchimento neutro, recorte ciano e luz baixa de retorno substituem o verde
+  chapado. A névoa é curta, as plantas variam entre verde, oliva e ocre e o
+  canteiro marrom separa o dinossauro do fundo.
+- **Terminal de observação:** a estrutura abstrata anterior foi substituída por
+  console sólido inclinado, emissor central, feedback em quatro estágios e uma
+  maquete volumétrica nomeada da Cozinha, eixo, Salas A–D e Sala Final. Pulsos
+  determinísticos aparecem dentro dos ambientes; transições acendem apenas
+  conexões reais; a rota escolhida liga origem, destino e fechamento. O texto
+  físico `OBSERVAÇÃO › MEMÓRIA › INTERPRETAÇÃO › CONSEQUÊNCIA` condensa o ciclo
+  sem transformar a estação em dashboard.
+
+Nenhum asset externo foi adicionado. Textura de pele, rótulos e placa são
+CanvasTextures locais; as malhas novas continuam procedurais e compactas. A
+Sala Dino mantém uma única luz com sombra e a estação usa somente uma luz de
+projetor sem sombra.
+
+**Validação realizada:** consulta ao `monari-ai-brain`; inspeção visual de base
+e comparativa com modos apresentação/inspeção; sintaxe dos cinco módulos
+JavaScript alterados; `git diff --check`; console do navegador sem erros;
+Cozinha no spawn sem miniatura aparente; close da descoberta; raycast dentro de
+2,1 m; primeira ativação `true` e repetição `false`; colisor deslocado e porta
+liberada; Sala Dino na entrada e em close; estação ociosa, ativa e em estado
+final com uma sequência determinística; Dossiê, Diário e modo técnico ainda
+presentes. O harness visual temporário foi removido.
+
+**Validação manual restante:** fazer uma passagem completa com teclado e mouse
+no notebook/tela da apresentação para calibrar distância de descoberta do mini
+dino, conforto de circulação junto ao banco, sensação de peso da estante,
+volume do áudio já existente, leitura dos detalhes mais escuros do dinossauro e
+clique de retorno à Cozinha. Também vale reproduzir sessões reais de cada rota
+A–D para conferir a leitura das quatro trilhas na maquete sob a iluminação da
+Sala Final.

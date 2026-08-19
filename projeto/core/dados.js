@@ -227,9 +227,7 @@ window.DATA = {
       prefixo: "FINAL",
       descricao: "Uma pequena sala institucional de avaliação. Sobre a mesa, um único arquivo aguarda consulta.",
       objetos: [
-        { id: "dossie", nome: "Arquivo", icone: "caderno", fala: "Examinar registro" },
-        { id: "dino", nome: "Miniatura", icone: "registro", fala: "Uma identificação técnica quase apagada: DINO." },
-        { id: "porta-dino", nome: "Acesso não catalogado", icone: "porta", ehSaida: true, proxima: "salaDino" }
+        { id: "dossie", nome: "Arquivo", icone: "caderno", fala: "Examinar registro" }
       ]
     },
     salaDino: {
@@ -237,7 +235,7 @@ window.DATA = {
       prefixo: "DINO",
       descricao: "Uma sala de manutenção que não consta na planta. A vegetação parece ter sido instalada antes das paredes.",
       objetos: [
-        { id: "porta-retorno", nome: "Retornar à Sala Final", icone: "porta", ehSaida: true, proxima: "salaFinal" }
+        { id: "porta-retorno", nome: "Retornar à Cozinha", icone: "porta", ehSaida: true, proxima: "cozinha" }
       ]
     }
   },

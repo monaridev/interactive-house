@@ -29,5 +29,9 @@ transições, Vestígios e rota. Esse estado altera discretamente os ambientes e
 alimenta a reconstrução física disponível na Sala Final. Nada é persistido:
 recarregar a página inicia outra sessão.
 
-Na Sala Final, uma miniatura escondida na estante revela o acesso opcional ao
-Ambiente não catalogado. Esse desvio não altera rota nem dossiê.
+Na Sala Final, um terminal de observação recompõe essa memória sobre uma
+maquete holográfica da House, sem substituir o modo técnico.
+
+Na Cozinha, uma miniatura quase sob o banco leste aciona a estante doméstica e
+revela o acesso opcional ao Ambiente não catalogado. Esse desvio não altera
+rota, Vestígios nem dossiê e retorna à própria Cozinha.

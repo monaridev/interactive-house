@@ -12,6 +12,150 @@ import { TEX } from "./texturas.js"
 import { criarModelo, criarPorta, DECALQUES } from "./modelos.js"
 import { caixa, cilindro } from "./colisao.js"
 
+function mesh(geometria, material, x, y, z, rx = 0, ry = 0, rz = 0) {
+  const objeto = new THREE.Mesh(geometria, material)
+  objeto.position.set(x, y, z)
+  objeto.rotation.set(rx, ry, rz)
+  objeto.castShadow = true
+  objeto.receiveShadow = true
+  return objeto
+}
+
+// Pequena estatueta de resina. Corpo, cauda e cabeça são superfícies contínuas
+// construídas por perfis, em vez de primitivas encostadas. Continua barata de
+// renderizar, mas a silhueta lê como um brinquedo esculpido quando é encontrada.
+function criarMiniDino() {
+  const grupo = new THREE.Group()
+  const resina = new THREE.MeshPhysicalMaterial({
+    color: 0x6d7352,
+    roughness: 0.42,
+    metalness: 0.04,
+    clearcoat: 0.34,
+    clearcoatRoughness: 0.52,
+  })
+  const ventre = new THREE.MeshStandardMaterial({ color: 0x9a8a65, roughness: 0.57 })
+  const escuro = new THREE.MeshStandardMaterial({ color: 0x121713, roughness: 0.3 })
+
+  function perfilX(secoes, segmentos = 10) {
+    const posicoes = []
+    const uvs = []
+    const indices = []
+    for (let i = 0; i < secoes.length; i++) {
+      const s = secoes[i]
+      for (let j = 0; j < segmentos; j++) {
+        const a = j / segmentos * Math.PI * 2
+        posicoes.push(s.x, s.y + Math.cos(a) * s.ry, Math.sin(a) * s.rz)
+        uvs.push(i / (secoes.length - 1), j / segmentos)
+      }
+    }
+    for (let i = 0; i < secoes.length - 1; i++) {
+      for (let j = 0; j < segmentos; j++) {
+        const n = (j + 1) % segmentos
+        const a = i * segmentos + j
+        const b = i * segmentos + n
+        const c = (i + 1) * segmentos + j
+        const d = (i + 1) * segmentos + n
+        indices.push(a, c, b, b, c, d)
+      }
+    }
+    const geometria = new THREE.BufferGeometry()
+    geometria.setAttribute("position", new THREE.Float32BufferAttribute(posicoes, 3))
+    geometria.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2))
+    geometria.setIndex(indices)
+    geometria.computeVertexNormals()
+    return geometria
+  }
+
+  function perfilVertical(secoes, segmentos = 8) {
+    const posicoes = []
+    const indices = []
+    for (const s of secoes) {
+      for (let j = 0; j < segmentos; j++) {
+        const a = j / segmentos * Math.PI * 2
+        posicoes.push(s.x + Math.cos(a) * s.rx, s.y, s.z + Math.sin(a) * s.rz)
+      }
+    }
+    for (let i = 0; i < secoes.length - 1; i++) {
+      for (let j = 0; j < segmentos; j++) {
+        const n = (j + 1) % segmentos
+        const a = i * segmentos + j
+        const b = i * segmentos + n
+        const c = (i + 1) * segmentos + j
+        const d = (i + 1) * segmentos + n
+        indices.push(a, c, b, b, c, d)
+      }
+    }
+    const geometria = new THREE.BufferGeometry()
+    geometria.setAttribute("position", new THREE.Float32BufferAttribute(posicoes, 3))
+    geometria.setIndex(indices)
+    geometria.computeVertexNormals()
+    return geometria
+  }
+
+  const troncoECauda = new THREE.Mesh(perfilX([
+    { x: -0.215, y: 0.104, ry: 0.006, rz: 0.006 },
+    { x: -0.17, y: 0.108, ry: 0.018, rz: 0.017 },
+    { x: -0.105, y: 0.111, ry: 0.041, rz: 0.038 },
+    { x: -0.042, y: 0.116, ry: 0.066, rz: 0.057 },
+    { x: 0.022, y: 0.122, ry: 0.072, rz: 0.062 },
+    { x: 0.072, y: 0.136, ry: 0.052, rz: 0.049 },
+  ], 12), resina)
+  troncoECauda.castShadow = true
+  grupo.add(troncoECauda)
+
+  const pescocoECabeca = new THREE.Mesh(perfilX([
+    { x: 0.052, y: 0.135, ry: 0.042, rz: 0.041 },
+    { x: 0.08, y: 0.166, ry: 0.034, rz: 0.034 },
+    { x: 0.102, y: 0.197, ry: 0.038, rz: 0.038 },
+    { x: 0.135, y: 0.214, ry: 0.048, rz: 0.045 },
+    { x: 0.174, y: 0.211, ry: 0.039, rz: 0.041 },
+    { x: 0.205, y: 0.205, ry: 0.022, rz: 0.033 },
+  ], 12), resina)
+  pescocoECabeca.castShadow = true
+  grupo.add(pescocoECabeca)
+
+  const mandibula = new THREE.Mesh(perfilX([
+    { x: 0.133, y: 0.193, ry: 0.015, rz: 0.035 },
+    { x: 0.176, y: 0.191, ry: 0.014, rz: 0.034 },
+    { x: 0.207, y: 0.195, ry: 0.008, rz: 0.028 },
+  ], 10), ventre)
+  grupo.add(mandibula)
+
+  for (const lado of [-1, 1]) {
+    grupo.add(mesh(new THREE.SphereGeometry(0.006, 8, 6), escuro, 0.153, 0.226, lado * 0.039))
+    const perna = new THREE.Mesh(perfilVertical([
+      { x: -0.015, y: 0.126, z: lado * 0.047, rx: 0.031, rz: 0.027 },
+      { x: -0.004, y: 0.083, z: lado * 0.052, rx: 0.027, rz: 0.023 },
+      { x: 0.024, y: 0.047, z: lado * 0.053, rx: 0.016, rz: 0.015 },
+      { x: 0.038, y: 0.018, z: lado * 0.054, rx: 0.011, rz: 0.011 },
+    ]), resina)
+    perna.castShadow = true
+    grupo.add(perna)
+    grupo.add(mesh(new THREE.BoxGeometry(0.055, 0.013, 0.027), ventre, 0.058, 0.012, lado * 0.054, 0, -0.08, 0))
+
+    const braco = new THREE.Mesh(perfilVertical([
+      { x: 0.076, y: 0.15, z: lado * 0.041, rx: 0.01, rz: 0.008 },
+      { x: 0.097, y: 0.12, z: lado * 0.044, rx: 0.008, rz: 0.007 },
+      { x: 0.121, y: 0.106, z: lado * 0.043, rx: 0.004, rz: 0.004 },
+    ], 7), resina)
+    grupo.add(braco)
+  }
+
+  grupo.add(mesh(new THREE.SphereGeometry(0.0038, 7, 5), escuro, 0.197, 0.216, 0.022))
+
+  // O volume acompanha de perto a peça visível: mirar na estatueta funciona,
+  // mas mirar no espaço em volta dela não entrega o segredo por acidente.
+  const hitbox = mesh(
+    new THREE.BoxGeometry(0.405, 0.225, 0.13),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, colorWrite: false, depthWrite: false }),
+    -0.005, 0.112, 0,
+  )
+  hitbox.castShadow = false
+  hitbox.receiveShadow = false
+  grupo.add(hitbox)
+  return { grupo, material: resina }
+}
+
 // ---------- dimensões ----------
 // Evolução moderada da planta anterior (4,28 x 3,28m). A sala ganha ar para
 // circulação ao redor da ilha sem deixar de parecer uma cozinha doméstica.
@@ -65,6 +209,8 @@ export function construirCozinha(scene) {
   const salaData = window.DATA.salas.cozinha
   const objetos = salaData.objetos.filter((o) => !o.ehSaida)
   const porta = salaData.objetos.find((o) => o.ehSaida)
+  const refDino = { id: "dino", nome: "Miniatura", fala: "Uma identificação técnica quase apagada: DINO." }
+  const refPortaDino = { id: "porta-dino", nome: "Acesso não catalogado", ehSaida: true, proxima: "salaDino" }
 
   // ---------- materiais de arquitetura ----------
   const matParede = new THREE.MeshStandardMaterial({
@@ -302,23 +448,27 @@ export function construirCozinha(scene) {
 
   // ---------- estante doméstica ----------
   const matPrateleira = new THREE.MeshStandardMaterial({ map: TEX.madeiraEscura(1, 3), color: 0x6a5e4d, roughness: 0.84 })
+  const estanteMovel = new THREE.Group()
+  estanteMovel.position.set(ESTANTE.x, 0, ESTANTE.z)
   const fundoEstante = new THREE.Mesh(new THREE.BoxGeometry(0.025, ESTANTE.altura, ESTANTE.profundidade), matPrateleira)
-  fundoEstante.position.set(-META_X + 0.025, ESTANTE.altura / 2, ESTANTE.z)
-  scene.add(fundoEstante)
-  for (const z of [ESTANTE.z - ESTANTE.profundidade / 2, ESTANTE.z + ESTANTE.profundidade / 2]) {
+  fundoEstante.position.set(-META_X + 0.025 - ESTANTE.x, ESTANTE.altura / 2, 0)
+  estanteMovel.add(fundoEstante)
+  for (const z of [-ESTANTE.profundidade / 2, ESTANTE.profundidade / 2]) {
     const lateral = new THREE.Mesh(new THREE.BoxGeometry(ESTANTE.largura, ESTANTE.altura, 0.045), matPrateleira)
-    lateral.position.set(ESTANTE.x, ESTANTE.altura / 2, z)
+    lateral.position.set(0, ESTANTE.altura / 2, z)
     lateral.castShadow = true
-    scene.add(lateral)
+    estanteMovel.add(lateral)
   }
   const alturasEstante = [0.36, 0.76, 1.16, 1.56, 1.88]
   for (const y of alturasEstante) {
     const prateleira = new THREE.Mesh(new THREE.BoxGeometry(ESTANTE.largura, 0.04, ESTANTE.profundidade), matPrateleira)
-    prateleira.position.set(ESTANTE.x, y, ESTANTE.z)
+    prateleira.position.set(0, y, 0)
     prateleira.castShadow = true
-    scene.add(prateleira)
+    estanteMovel.add(prateleira)
   }
-  obstaculos.push(caixa(ESTANTE.x, ESTANTE.z, ESTANTE.largura, ESTANTE.profundidade))
+  scene.add(estanteMovel)
+  const colisorEstante = caixa(ESTANTE.x, ESTANTE.z, ESTANTE.largura, ESTANTE.profundidade)
+  obstaculos.push(colisorEstante)
 
   // Poucas louças, repetidas. Dois espaços permanecem vazios e recebem só
   // uma silhueta de poeira — o segundo sinal familiar da sala.
@@ -326,8 +476,8 @@ export function construirCozinha(scene) {
   const matVidro = new THREE.MeshStandardMaterial({ color: 0xaebfc0, roughness: 0.2, transparent: true, opacity: 0.38 })
   const adicionarRecipiente = (y, z, vidro = false) => {
     const recipiente = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.052, 0.11, 16, 1, true), vidro ? matVidro : matLouca)
-    recipiente.position.set(-META_X + 0.21, y, z)
-    scene.add(recipiente)
+    recipiente.position.set(-META_X + 0.21 - ESTANTE.x, y, z - ESTANTE.z)
+    estanteMovel.add(recipiente)
   }
   adicionarRecipiente(0.435, 0.53)
   adicionarRecipiente(0.435, 0.73)
@@ -337,9 +487,35 @@ export function construirCozinha(scene) {
   for (const [y, z] of [[0.382, -0.48], [1.182, 0.55]]) {
     const vazio = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.13), matPoeira)
     vazio.rotation.x = -Math.PI / 2
-    vazio.position.set(-META_X + 0.22, y, z)
-    scene.add(vazio)
+    vazio.position.set(-META_X + 0.22 - ESTANTE.x, y, z - ESTANTE.z)
+    estanteMovel.add(vazio)
   }
+
+  // Acesso oculto atrás do móvel existente. Moldura, trilho no rodapé e
+  // pequena diferença de material fazem a estante parecer parte planejada da
+  // cozinha; antes de ela correr, nada denuncia uma porta interativa.
+  const matRecesso = new THREE.MeshStandardMaterial({ color: 0x111715, roughness: 0.92 })
+  const matTrilho = new THREE.MeshStandardMaterial({ color: 0x3f4541, roughness: 0.42, metalness: 0.68 })
+  const passagem = new THREE.Group()
+  passagem.position.set(-META_X + 0.012, 0, ESTANTE.z)
+  passagem.rotation.y = Math.PI / 2
+  passagem.add(mesh(new THREE.PlaneGeometry(0.86, 2.02), matRecesso, 0, 1.01, -0.008))
+  for (const x of [-0.45, 0.45]) passagem.add(mesh(new THREE.BoxGeometry(0.055, 2.08, 0.065), matTrilho, x, 1.04, 0))
+  passagem.add(mesh(new THREE.BoxGeometry(0.96, 0.055, 0.065), matTrilho, 0, 2.055, 0))
+  scene.add(passagem)
+
+  const portaSecreta = criarPorta(0.8, 1.96)
+  portaSecreta.position.set(-META_X + 0.04, 0, ESTANTE.z)
+  portaSecreta.rotation.y = Math.PI / 2
+  portaSecreta.userData = { tipo: "porta", ref: refPortaDino }
+  scene.add(portaSecreta)
+  const luzSecreta = new THREE.PointLight(0x72a488, 0, 2.45, 2)
+  luzSecreta.position.set(-META_X + 0.48, 1.02, ESTANTE.z)
+  scene.add(luzSecreta)
+
+  const trilhoBaixo = mesh(new THREE.BoxGeometry(0.035, 0.018, ESTANTE.profundidade + 1.16), matTrilho, -META_X + 0.19, 0.012, ESTANTE.z - 0.54)
+  trilhoBaixo.visible = false
+  scene.add(trilhoBaixo)
 
   // ---------- ilha e lugares à mesa ----------
   const corpoIlha = new THREE.Mesh(new THREE.BoxGeometry(ILHA.largura - 0.12, ILHA.altura - 0.08, ILHA.profundidade - 0.1), matArmario)
@@ -367,6 +543,16 @@ export function construirCozinha(scene) {
     }
     obstaculos.push(cilindro(bancoPos.x, bancoPos.z, 0.19))
   }
+
+  // Easter egg quase sob o banco leste, no estreito intervalo entre assento e
+  // ilha. O banco e o corpo da ilha o ocluem do spawn; ele só aparece quando
+  // alguém contorna o móvel e deliberadamente olha para o chão entre as pernas.
+  const { grupo: miniDino, material: materialMiniDino } = criarMiniDino()
+  miniDino.position.set(-0.12, 0.012, 0.585)
+  miniDino.rotation.y = -0.24
+  miniDino.userData = { tipo: "dino", ref: refDino }
+  scene.add(miniDino)
+  interativos.push(miniDino)
 
   // Terceiro sinal familiar: o terceiro lugar existe apenas como marca de uso.
   const marcaLugar = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.012, 7, 28), matPoeira)
@@ -514,12 +700,34 @@ export function construirCozinha(scene) {
       return
     }
     const modelo = criarModelo(o.id)
-    modelo.position.set(p.x, p.y, p.z)
+    const pertenceAEstante = ["caderno", "etiqueta", "relogio", "camera"].includes(o.id)
+    modelo.position.set(
+      p.x - (pertenceAEstante ? ESTANTE.x : 0),
+      p.y,
+      p.z - (pertenceAEstante ? ESTANTE.z : 0),
+    )
     modelo.rotation.y = p.rotY || 0
     modelo.userData = { tipo: "objeto", ref: o, decalque: DECALQUES.has(o.id) }
-    scene.add(modelo)
+    if (pertenceAEstante) estanteMovel.add(modelo)
+    else scene.add(modelo)
     interativos.push(modelo)
   })
+
+  let dinoAcionado = false
+  let deslocamentoEstante = 0
+  let portaDinoLiberada = false
+  let tempoDino = 0
+  const deslocamentoMaximo = 1.12
+
+  function ativarDino() {
+    if (dinoAcionado) return false
+    dinoAcionado = true
+    trilhoBaixo.visible = true
+    materialMiniDino.emissive.set(0x263629)
+    materialMiniDino.emissiveIntensity = 0.28
+    miniDino.rotation.z = -0.075
+    return true
+  }
 
   return {
     id: "cozinha",
@@ -533,5 +741,22 @@ export function construirCozinha(scene) {
     // anormalmente frio da bancada. A fonte fica além da face visível.
     fonteSom: { x: META_X + 0.18, y: 0.48, z: BANCADA_FRIA.z },
     limites: { peDireito: PE_DIREITO },
+    ativarDino,
+    atualizar(delta) {
+      if (!dinoAcionado) return
+      tempoDino += delta
+      deslocamentoEstante = Math.min(deslocamentoMaximo, deslocamentoEstante + delta * 0.34)
+      const progresso = deslocamentoEstante / deslocamentoMaximo
+      const deslocamento = deslocamentoMaximo * (1 - Math.pow(1 - progresso, 3))
+      estanteMovel.position.z = ESTANTE.z - deslocamento
+      colisorEstante.minZ = ESTANTE.z - deslocamento - ESTANTE.profundidade / 2
+      colisorEstante.maxZ = ESTANTE.z - deslocamento + ESTANTE.profundidade / 2
+      luzSecreta.intensity = Math.max(0, (deslocamento - 0.28) * 2.1)
+      materialMiniDino.emissiveIntensity = 0.18 + (Math.sin(tempoDino * 3.8) + 1) * 0.055
+      if (deslocamentoEstante >= 1.02 && !portaDinoLiberada) {
+        portaDinoLiberada = true
+        interativos.push(portaSecreta)
+      }
+    },
   }
 }

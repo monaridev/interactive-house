@@ -209,13 +209,21 @@ let temporizadorHud = null
 function alvoInterativo() {
   raycaster.setFromCamera(centro, camera)
   const hits = raycaster.intersectObjects(sala.interativos, true)
+  let primeiro = null
   for (const hit of hits) {
     if (hit.distance > ALCANCE) break
     let no = hit.object
     while (no && !no.userData?.tipo) no = no.parent
-    if (no) return no
+    if (!no) continue
+    // A miniatura fica deliberadamente atrás da composição da ilha. Alguns
+    // modelos sobre o tampo têm várias submalhas e podem atravessar o mesmo
+    // raio depois dela; quando a mira realmente cruza a hitbox justa do dino,
+    // o segredo tem prioridade. Isso não amplia sua área nem altera os demais
+    // alvos — apenas impede que um copo distante roube um clique visível.
+    if (no.userData.tipo === "dino") return no
+    if (!primeiro) primeiro = no
   }
-  return null
+  return primeiro
 }
 
 // Descrição da sala, vinda de dados.js (a mesma função que o 2D chama).
