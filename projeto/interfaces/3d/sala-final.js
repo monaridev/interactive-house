@@ -5,13 +5,21 @@ import { criarPorta } from "./modelos.js"
 import { criarReconstrucao } from "./reconstrucao.js"
 import { combinacoesRaras, intensidade, vestigioPredominante } from "./vestigios.js"
 
-// Sala Final — uma pequena sala de avaliação. Diferente da Sala D, o
-// arquivo não domina a arquitetura: há poucos móveis e toda a composição
-// conduz ao único objeto interativo, o dossiê sobre a mesa.
-const LARGURA = 4.8
-const COMPRIMENTO = 4.6
+// Sala Final — uma pequena sala de avaliação organizada em três zonas:
+// reconstrução, dossiê e Diário. A estação conduz a leitura, enquanto os
+// documentos encerram a experiência sem competir com ela.
+const LARGURA = 5.2
+const COMPRIMENTO = 5.0
 const PE_DIREITO = 2.7
 const ESPESSURA = 0.15
+const MESA_X = -0.24
+const MESA_Z = 0.24
+const CADEIRA_X = -0.7
+const CADEIRA_Z = 1.24
+const ESTANTE_X = -1.86
+const ESTANTE_Z = -2.05
+const ESTACAO_X = 1.62
+const ESTACAO_Z = -1.52
 
 function mesh(geometria, material, x, y, z, rx = 0, ry = 0, rz = 0) {
   const objeto = new THREE.Mesh(geometria, material)
@@ -173,36 +181,37 @@ export function construirSalaFinal(scene, ctx = {}) {
   scene.add(mesh(new THREE.BoxGeometry(0.62, 0.018, 0.075), marcaRota, deslocamentoRota, PE_DIREITO - 0.054, 0.7))
   if (ctx.rotaFinalId) manifestacoes.push(`rota:${ctx.rotaFinalId}`)
 
-  // Mesa central, robusta e vazia o bastante para o arquivo dominar.
+  // Mesa ligeiramente à esquerda e à frente: o dossiê forma a segunda
+  // leitura da sala sem se sobrepor à estação no enquadramento de entrada.
   const mesaL = 1.8
   const mesaP = 1.08
   const mesaA = 0.78
-  scene.add(mesh(new THREE.BoxGeometry(mesaL, 0.09, mesaP), madeira, 0, mesaA, 0.05))
-  scene.add(mesh(new THREE.BoxGeometry(mesaL - 0.16, 0.16, 0.055), madeira, 0, mesaA - 0.12, -0.44))
-  scene.add(mesh(new THREE.BoxGeometry(mesaL - 0.16, 0.16, 0.055), madeira, 0, mesaA - 0.12, 0.54))
-  scene.add(mesh(new THREE.BoxGeometry(0.055, 0.16, mesaP - 0.16), madeira, -0.79, mesaA - 0.12, 0.05))
-  scene.add(mesh(new THREE.BoxGeometry(0.055, 0.16, mesaP - 0.16), madeira, 0.79, mesaA - 0.12, 0.05))
+  scene.add(mesh(new THREE.BoxGeometry(mesaL, 0.09, mesaP), madeira, MESA_X, mesaA, MESA_Z))
+  scene.add(mesh(new THREE.BoxGeometry(mesaL - 0.16, 0.16, 0.055), madeira, MESA_X, mesaA - 0.12, MESA_Z - 0.49))
+  scene.add(mesh(new THREE.BoxGeometry(mesaL - 0.16, 0.16, 0.055), madeira, MESA_X, mesaA - 0.12, MESA_Z + 0.49))
+  scene.add(mesh(new THREE.BoxGeometry(0.055, 0.16, mesaP - 0.16), madeira, MESA_X - 0.79, mesaA - 0.12, MESA_Z))
+  scene.add(mesh(new THREE.BoxGeometry(0.055, 0.16, mesaP - 0.16), madeira, MESA_X + 0.79, mesaA - 0.12, MESA_Z))
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    scene.add(mesh(new THREE.BoxGeometry(0.075, mesaA, 0.075), metalEscuro, sx * 0.75, mesaA / 2, 0.05 + sz * 0.39))
+    scene.add(mesh(new THREE.BoxGeometry(0.075, mesaA, 0.075), metalEscuro, MESA_X + sx * 0.75, mesaA / 2, MESA_Z + sz * 0.39))
   }
-  obstaculos.push(caixa(0, 0.05, mesaL, mesaP))
+  obstaculos.push(caixa(MESA_X, MESA_Z, mesaL, mesaP))
 
   // Cadeira do avaliador, voltada para a mesa e ligeiramente fora do eixo
   // para não esconder o dossiê no enquadramento inicial.
-  scene.add(mesh(new THREE.BoxGeometry(0.55, 0.08, 0.5), tecido, -0.42, 0.48, 1.02))
-  scene.add(mesh(new THREE.BoxGeometry(0.55, 0.075, 0.07), tecido, -0.42, 1.07, 1.24, 0.06))
-  for (const x of [-0.62, -0.52, -0.42, -0.32, -0.22]) {
-    scene.add(mesh(new THREE.BoxGeometry(0.045, 0.5, 0.055), tecido, x, 0.81, 1.24, 0.06))
+  scene.add(mesh(new THREE.BoxGeometry(0.55, 0.08, 0.5), tecido, CADEIRA_X, 0.48, CADEIRA_Z))
+  scene.add(mesh(new THREE.BoxGeometry(0.55, 0.075, 0.07), tecido, CADEIRA_X, 1.07, CADEIRA_Z + 0.22, 0.06))
+  for (const deslocamentoX of [-0.2, -0.1, 0, 0.1, 0.2]) {
+    scene.add(mesh(new THREE.BoxGeometry(0.045, 0.5, 0.055), tecido, CADEIRA_X + deslocamentoX, 0.81, CADEIRA_Z + 0.22, 0.06))
   }
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    scene.add(mesh(new THREE.BoxGeometry(0.05, 0.47, 0.05), metalEscuro, -0.42 + sx * 0.22, 0.235, 1.02 + sz * 0.19))
+    scene.add(mesh(new THREE.BoxGeometry(0.05, 0.47, 0.05), metalEscuro, CADEIRA_X + sx * 0.22, 0.235, CADEIRA_Z + sz * 0.19))
   }
-  obstaculos.push(caixa(-0.42, 1.02, 0.62, 0.62))
+  obstaculos.push(caixa(CADEIRA_X, CADEIRA_Z, 0.62, 0.62))
 
   // Armário e estante permanecem como apoio documental do Diário. O acesso
   // bônus não disputa mais atenção com o fechamento principal desta sala.
   const estante = new THREE.Group()
-  estante.position.set(-1.63, 0, -1.82)
+  estante.position.set(ESTANTE_X, 0, ESTANTE_Z)
   estante.add(mesh(new THREE.BoxGeometry(1.15, 0.78, 0.38), metal, 0, 0.39, 0))
   for (const y of [0.16, 0.39, 0.62]) {
     estante.add(mesh(new THREE.BoxGeometry(1.01, 0.18, 0.025), metalEscuro, 0, y, 0.205))
@@ -236,7 +245,7 @@ export function construirSalaFinal(scene, ctx = {}) {
   scene.add(estante)
 
   let tempoDiario = 0
-  const colisorEstante = caixa(-1.63, -1.82, 1.2, 0.42)
+  const colisorEstante = caixa(ESTANTE_X, ESTANTE_Z, 1.2, 0.42)
   obstaculos.push(colisorEstante)
 
   // Porta fechada e quadro de protocolo: elementos estáticos, sem competir
@@ -260,7 +269,7 @@ export function construirSalaFinal(scene, ctx = {}) {
   }
   if (combinacoes.mesaObservada) {
     const lente = new THREE.MeshStandardMaterial({ color: 0x1b2220, emissive: 0x547269, emissiveIntensity: 0.32, roughness: 0.22, metalness: 0.5 })
-    scene.add(mesh(new THREE.RingGeometry(0.035, 0.052, 18), lente, 0.66, 0.71, -0.44, -Math.PI / 2))
+    scene.add(mesh(new THREE.RingGeometry(0.035, 0.052, 18), lente, MESA_X + 0.66, 0.71, MESA_Z - 0.49, -Math.PI / 2))
     manifestacoes.push("rara:mesaObservada")
   }
 
@@ -269,23 +278,24 @@ export function construirSalaFinal(scene, ctx = {}) {
     vestigios,
     rota: ctx.rotaFinalId,
   })
-  reconstrucao.grupo.position.set(1.42, 0, -1.15)
-  reconstrucao.grupo.rotation.y = -0.22
+  reconstrucao.grupo.position.set(ESTACAO_X, 0, ESTACAO_Z)
+  reconstrucao.grupo.rotation.y = -0.2
   scene.add(reconstrucao.grupo)
   interativos.push(reconstrucao.interativo)
-  obstaculos.push(caixa(1.42, -1.15, 1.22, 0.76))
+  obstaculos.push(caixa(ESTACAO_X, ESTACAO_Z, 1.22, 0.76))
 
-  // O dossiê continua sendo o alvo principal no centro da composição.
+  // O dossiê permanece no centro funcional, como segunda etapa da leitura.
   const dossie = criarDossie({ pasta, papel, tinta, metal }, vestigios, ctx.rotaFinalId)
-  dossie.position.set(0.08, mesaA + 0.055, -0.02)
+  dossie.position.set(MESA_X + 0.08, mesaA + 0.055, MESA_Z - 0.07)
   dossie.rotation.y = intensidade(vestigios, "ordem") >= 3 ? -0.08 : -0.16
   dossie.userData = { tipo: "dossie", ref: refDossie }
   scene.add(dossie)
   interativos.push(dossie)
 
-  // Luz institucional envelhecida, com foco discreto no documento.
-  scene.add(new THREE.AmbientLight(0x4e4d48, 0.58))
-  scene.add(new THREE.HemisphereLight(0x8f9896, 0x2b2925, 0.54))
+  // Luz institucional envelhecida. A base fria mantém a sala escura, mas
+  // devolve informação mínima a piso, paredes e volumes periféricos.
+  scene.add(new THREE.AmbientLight(0x4a4d49, 0.82))
+  scene.add(new THREE.HemisphereLight(0x87928f, 0x292724, 0.72))
   const corLuzPredominante = {
     corte: 0xe1c7bc,
     frio: 0xc5dde0,
@@ -295,18 +305,21 @@ export function construirSalaFinal(scene, ctx = {}) {
     registro: 0xd7d1bd,
     ordem: 0xddd9c6,
   }[predominante] || 0xe4dbc5
-  const teto = new THREE.PointLight(corLuzPredominante, 4.9 + Math.min(analisados, 12) * 0.035, 6.2, 1.85)
-  teto.position.set(0, 2.42, 0.18)
+  const teto = new THREE.PointLight(corLuzPredominante, 3.55 + Math.min(analisados, 12) * 0.025, 6.4, 1.9)
+  teto.position.set(0.28, 2.18, -0.08)
   teto.castShadow = true
   teto.shadow.mapSize.set(512, 512)
   scene.add(teto)
-  const calha = new THREE.MeshStandardMaterial({ color: 0xd0c7b3, emissive: 0xbcb39f, emissiveIntensity: 1.6, roughness: 0.28 })
-  scene.add(mesh(new THREE.BoxGeometry(1.1, 0.04, 0.13), calha, 0, 2.57, 0.18))
-  const preenchimento = new THREE.PointLight(0xa9b2ae, 1.35, 4.2, 2)
-  preenchimento.position.set(-1.45, 1.45, -1.2)
+  const calha = new THREE.MeshBasicMaterial({ color: 0x777168 })
+  scene.add(mesh(new THREE.BoxGeometry(0.92, 0.035, 0.11), calha, 0.28, 2.57, -0.08))
+  const preenchimento = new THREE.PointLight(0x9ba7a3, 1.18, 5, 1.95)
+  preenchimento.position.set(-1.85, 1.35, -1.55)
   scene.add(preenchimento)
-  const foco = new THREE.SpotLight(0xe8d6aa, 3.4, 3.2, Math.PI / 5, 0.72, 2)
-  foco.position.set(0.45, 1.85, 0.55)
+  const fillArquitetura = new THREE.PointLight(0x78837f, 0.72, 5.4, 2)
+  fillArquitetura.position.set(2.15, 0.78, 1.72)
+  scene.add(fillArquitetura)
+  const foco = new THREE.SpotLight(0xe8d6aa, 3.1, 3.6, Math.PI / 5, 0.72, 2)
+  foco.position.set(0.32, 1.85, 0.72)
   foco.target.position.copy(dossie.position)
   scene.add(foco)
   scene.add(foco.target)
@@ -320,8 +333,8 @@ export function construirSalaFinal(scene, ctx = {}) {
     porta: null,
     obstaculos,
     interativos,
-    spawn: { x: 0.92, y: 1.65, z: 1.78, olharY: 0.42 },
-    fonteSom: { x: -0.2, y: 2.56, z: 0.18 },
+    spawn: { x: 0.96, y: 1.65, z: 1.98, olharY: 0.16 },
+    fonteSom: { x: 0.28, y: 2.56, z: -0.08 },
     limites: { peDireito: PE_DIREITO },
     manifestacoes,
     reconstrucao,
@@ -331,7 +344,7 @@ export function construirSalaFinal(scene, ctx = {}) {
       reconstrucao.atualizar(delta)
       if (combinacoes.ordemInterrompida) {
         const ciclo = tempoDiario % 7.5
-        calha.emissiveIntensity = ciclo > 6.92 && ciclo < 7.02 ? 0.18 : 1.6
+        calha.color.setHex(ciclo > 6.92 && ciclo < 7.02 ? 0x2d2b28 : 0x777168)
       }
     },
   }
